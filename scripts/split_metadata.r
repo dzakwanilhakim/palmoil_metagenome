@@ -12,6 +12,7 @@ for (batch in batches) {
   df <- metadata_all %>%
     filter(`16S` == 1, Batch_Ekstraksi == batch) %>%
     select(
+      -Barcode_ITS,
       -ITS,
       -Hasil_Sekuensing_ITS,
       -Flag_ITS,
@@ -35,6 +36,7 @@ for (batch in batches) {
   df <- metadata_all %>%
     filter(ITS == 1, Batch_Ekstraksi == batch) %>%
     select(
+      -Barcode_16S,
       -`16S`,
       -Hasil_Sekuensing_16S,
       -Flag_16S,

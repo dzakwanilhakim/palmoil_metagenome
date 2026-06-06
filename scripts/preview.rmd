@@ -1,0 +1,15 @@
+```{r}
+library(dplyr)
+```
+
+```{r}
+metadata_example_its <- read.delim(
+  "data/raw/metadata_16s/metadata_16s_batch_1.tsv",
+  sep = "\t",
+  check.names = FALSE
+)
+```
+
+```{r}
+
+```

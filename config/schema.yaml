@@ -1,0 +1,114 @@
+# =============================================================================
+# schema.yaml  —  Single source of truth for the data contract
+# Stage 1 deliverable. The compile + validation steps read THIS file.
+# Nothing downstream hardcodes column names or allowed values; they come here.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. COLUMN MAPPING  (source Indonesian name  ->  canonical pipeline name)
+#    The compile step renames metadata columns using this map.
+# -----------------------------------------------------------------------------
+column_map:
+  "No/Kode_Sampel":        row_code
+  "ID_Sampel":             id_sampel        # biological sample identity
+  "Nama_Sampel":           sample_name
+  "Jenis_Kebun":           stage            # TM vs Nursery  (PRIMARY FILTER)
+  "Kelompok_Kebun":        field            # corporate / kebun group
+  "Kelompok_Pupuk":        fertilizer       # levels DEPEND on stage
+  "Fase_Treatment":        timepoint        # T0, T1, ...
+  "Barcode_16S":           barcode_16s
+  "Barcode_ITS":           barcode_its
+  "Batch_Ekstraksi":       extraction_batch
+  "Hasil_Sekuensing_16S":  seq_result_16s
+  "Flag_16S":              flag_16s
+  "Hasil_Sekuensing_ITS":  seq_result_its   # may be absent in some files
+  "Flag_ITS":              flag_its          # may be absent in some files
+
+# -----------------------------------------------------------------------------
+# 2. CANONICAL COLUMNS required AFTER mapping (validation checks presence)
+# -----------------------------------------------------------------------------
+required_columns:
+  - id_sampel
+  - stage
+  - field
+  - fertilizer
+  - timepoint
+  - extraction_batch
+
+# Marker-specific columns (at least one marker's set must be present)
+marker_columns:
+  16S:
+    barcode: barcode_16s
+    flag:    flag_16s
+    seq_result: seq_result_16s
+  ITS:
+    barcode: barcode_its
+    flag:    flag_its
+    seq_result: seq_result_its
+
+# -----------------------------------------------------------------------------
+# 3. ALLOWED VALUES
+#    stage is fixed (2 levels). fertilizer is NESTED within stage and is
+#    enumerated FROM THE DATA per stage — do NOT hardcode the PHN list because
+#    you weren't sure of the max (PHN12/PHN13). We validate the prefix instead.
+# -----------------------------------------------------------------------------
+allowed:
+  stage: [TM, Nursery]
+
+  # fertilizer is validated by PATTERN per stage, not a fixed list,
+  # so new PHN## levels don't break the pipeline.
+  fertilizer_pattern:
+    TM:      "^PH[1-9][0-9]*$"      # PH1 .. PH6 (and tolerant of more)
+    Nursery: "^PHN[0-9]{2}$"        # PHN01 .. PHN12/PHN13
+
+  # timepoint validated by pattern so T2..Tn don't require edits.
+  timepoint_pattern: "^T[0-9]+$"
+
+  # field / extraction_batch / seq_batch are enumerated from data (open set).
+
+# -----------------------------------------------------------------------------
+# 4. JOIN RULE  (matrix column header  <->  metadata barcode)
+#    Matrices are wide: taxa in rows, one column per barcode header.
+#    Barcodes RESET per batch, so the key is (seq_batch + barcode string).
+#    seq_batch is parsed from the matrix filename: wf_16s_batch_<N>_genus.tsv
+# -----------------------------------------------------------------------------
+join:
+  # how to match a matrix column header to metadata barcode value
+  # "full"   = exact string match (barcode01_97 == barcode01_97)
+  # "prefix" = match only the leading barcodeNN token (fallback)
+  mode: full
+  prefix_fallback: true        # if a batch matches 0 cols on full, retry prefix
+  prefix_regex: "^barcode[0-9]+"
+  # columns in the matrix that are NOT samples (taxonomy / totals)
+  non_sample_columns:
+    - genus
+    - phylum
+    - class
+    - order
+    - family
+    - tax
+    - total
+    - superkingdom
+    - kingdom
+  # filename -> seq_batch parsing
+  matrix_filename_regex: "wf_(16s|its)_batch_([0-9]+)_(genus|phylum)\\.tsv"
+  #   group1 = marker, group2 = seq_batch, group3 = rank
+
+# -----------------------------------------------------------------------------
+# 5. QC RULE
+#    Single rule: drop sample if the marker's flag == 1. Ignore seq_result text.
+# -----------------------------------------------------------------------------
+qc:
+  drop_when_flag_equals: 1
+  use_seq_result_text: false
+
+# -----------------------------------------------------------------------------
+# 6. ANALYSIS SETTINGS
+# -----------------------------------------------------------------------------
+analysis:
+  analysis_rank: genus           # alpha/beta computed at genus
+  stackbar_ranks: [phylum, genus]
+  unclassified_label: "Unclassified"   # keep, never silently drop
+  rarefaction_seed: 42
+  # rarefaction depth is decided PER (stage x marker) branch at runtime,
+  # not globally — logged in QC output.
