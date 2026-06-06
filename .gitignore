@@ -1,0 +1,27 @@
+# R
+.Rhistory
+.RData
+.Ruserdata
+
+# RStudio
+.Rproj.user/
+
+# VS Code
+.vscode/
+
+# renv
+renv/library/
+renv/staging/
+
+# Output
+*.html
+*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Conda
+.env
+.conda
+
