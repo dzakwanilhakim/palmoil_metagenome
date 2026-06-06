@@ -6,6 +6,9 @@
 # RStudio
 .Rproj.user/
 
+# data
+/data
+
 # VS Code
 .vscode/
 
