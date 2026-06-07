@@ -7,7 +7,7 @@ library(targets)
 library(tarchetypes)
 
 tar_option_set(
-  packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork"),
+  packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork", "permute"),
   format   = "rds"     # default; long_qc overridden to parquet below
 )
 
@@ -120,8 +120,13 @@ list(
   # alpha plots routed into the depth-first per-universe tree (Results/)
   tar_target(report_tree, build_report_tree(alpha_div, comparisons,
                                             root = "Results"),
+             format = "file"),
+
+  # beta diversity (ordinations, dendrograms, PERMANOVA) into the same tree
+  tar_target(beta_tree, build_beta_tree(alpha_div, norm_tables,
+                                        root = "Results"),
              format = "file")
 
-  # ===== STAGE 4 cont. (beta, relabund) ====================================
+  # ===== STAGE 4 cont. (relative abundance / stacked bars) =================
   # appended next.
 )
