@@ -1,0 +1,83 @@
+# =============================================================================
+# comparisons.yaml — defines Goals A/B/C/D as declarative (subset, group) ops.
+# The Stage 4 engine iterates over these; adding/changing a goal needs no code.
+#
+# Each goal expands into MANY analyses (one per `per` combination present in
+# the data). Fields enumerated from data at runtime (timepoints, fields, etc).
+#
+# group_by  = the variable compared (color / x-axis / test grouping)
+# per       = run a separate analysis for each unique combination of these
+# stats     = which test family applies
+#   kw_wilcox : Kruskal-Wallis (>2 grp) + Wilcoxon post-hoc (alpha)
+#   wilcox_time : unpaired Wilcoxon rank-sum T0 vs T1 (alpha time effect)
+# permanova_factors = factors tested in PERMANOVA (beta)
+# strata    = blocking variable for PERMANOVA permutations (optional)
+# =============================================================================
+
+goals:
+
+  # ---- Palm Oil Consultant: intra-field (A, B) ----------------------------
+  A:
+    label: "Intra-field snapshot: fertilizers within a field at one timepoint"
+    consultant: palm_oil
+    group_by: fertilizer
+    per: [field, timepoint]            # one analysis per (field, timepoint)
+    stats: kw_wilcox
+    permanova_factors: [fertilizer]
+    strata: null
+
+  B:
+    label: "Intra-field longitudinal: T0 vs T1 within a field"
+    consultant: palm_oil
+    group_by: timepoint
+    per: [field]                       # one analysis per field
+    trajectory: true                   # line plots T0->T1, shape=fertilizer
+    stats: wilcox_time                 # unpaired T0 vs T1
+    stats_extra: per_fertilizer        # also run T0vsT1 within each fertilizer
+    permanova_factors: [timepoint, fertilizer]
+    strata: null
+
+  # ---- Fertilizer Consultant: cross-field (C, D) --------------------------
+  C:
+    label: "Cross-field snapshot: fertilizers across fields at one timepoint"
+    consultant: fertilizer
+    group_by: fertilizer
+    per: [timepoint]                   # one analysis per timepoint
+    stats: kw_wilcox
+    stats_extra: per_field             # also run grouped-by-fert within each field
+    permanova_factors: [fertilizer]
+    strata: field                      # block by field
+    permanova_facet_by_field: true
+
+  D:
+    label: "Cross-field longitudinal: T0 vs T1 across all fields"
+    consultant: fertilizer
+    group_by: timepoint
+    per: [global]                      # one analysis over everything
+    trajectory: true
+    trajectory_facet: field            # one trajectory panel per field
+    stats: wilcox_time                 # global unpaired T0 vs T1
+    stats_extra: per_fertilizer        # T0vsT1 within each fertilizer (pool fields)
+    permanova_factors: [timepoint, fertilizer]
+    strata: field
+
+# ---- alpha metrics computed for every goal ----
+alpha_metrics: [Observed, Pielou, Shannon]
+
+# ---- stats settings ----
+stats_settings:
+  min_n_per_group: 2        # gate: skip test if any compared group has n < 2
+  p_adjust_method: BH
+
+# ---- beta metrics ----
+beta_metrics:
+  aitchison:   {from: clr,      method: euclidean, ordination: PCA}
+  bray_curtis: {from: rarefied, method: bray,      ordination: PCoA}
+  jaccard:     {from: rarefied, method: jaccard, binary: true, ordination: PCoA}
+
+# ---- relative abundance / stacked bars ----
+relabund:
+  source: rarefied          # compute proportions FROM rarefied table
+  ranks: [phylum, genus]
+  top_n: 10                 # Top 10 each; rest -> "Other"
+  exclude_unclassified: true  # from PLOTS (full CSV keeps everything)

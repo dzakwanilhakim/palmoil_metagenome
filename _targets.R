@@ -7,7 +7,7 @@ library(targets)
 library(tarchetypes)
 
 tar_option_set(
-  packages = c("tidyverse", "yaml", "arrow", "vegan"),
+  packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork"),
   format   = "rds"     # default; long_qc overridden to parquet below
 )
 
@@ -82,10 +82,11 @@ list(
   # Step 3/4: master synchronized sample list
   tar_target(master_samples, master_sample_list(thresholded)),
 
-  # QC dropped-sample audit (which samples removed at Step 3 and why)
-  tar_target(qc_drop_report,
-             write_qc_drop_report(tax_filtered, thresholded, thresholds,
-                                  out_path = "results/dropped_samples_qc.csv"),
+  # Unified filtered-barcode audit: every barcode removed at ANY stage + reason
+  tar_target(filtered_barcode_report,
+             write_filtered_barcode_report(long_counts, metadata_all, joined_counts,
+                                           tax_filtered, thresholded, schema, thresholds,
+                                           out_path = "results/filtered_barcodes_all.csv"),
              format = "file"),
 
   # Step 4: post-QC assessment
@@ -99,8 +100,28 @@ list(
 
   # Step 5: synchronized rarefied + CLR tables (identical samples & OTUs)
   tar_target(norm_tables, build_rarefied_and_clr(thresholded, thresholds,
-                                                 seed = 42))
+                                                 seed = 42)),
 
-  # ===== STAGE 4+ (alpha/beta diversity, stackbars, A/B/C/D) ===============
-  # appended next, hanging off norm_tables (rarefied -> alpha, CLR -> beta).
+  # ===== STAGE 4 — alpha diversity + A/B/C/D stats =========================
+  tar_target(comparisons_file, "config/comparisons.yaml", format = "file"),
+  tar_target(comparisons, load_comparisons(comparisons_file)),
+
+  # per-sample alpha metrics (Observed, Pielou, Shannon) from rarefied
+  tar_target(alpha_div, compute_alpha(norm_tables, master_samples)),
+
+  # alpha stats per marker (A/B/C/D unpaired tests)
+  tar_target(alpha_stats_16s, run_alpha_stats(alpha_div, comparisons, "16S")),
+  tar_target(alpha_stats_its, run_alpha_stats(alpha_div, comparisons, "ITS")),
+  tar_target(alpha_stats_16s_csv, write_alpha_stats(alpha_stats_16s, "16S"),
+             format = "file"),
+  tar_target(alpha_stats_its_csv, write_alpha_stats(alpha_stats_its, "ITS"),
+             format = "file"),
+
+  # alpha plots routed into the depth-first per-universe tree (Results/)
+  tar_target(report_tree, build_report_tree(alpha_div, comparisons,
+                                            root = "Results"),
+             format = "file")
+
+  # ===== STAGE 4 cont. (beta, relabund) ====================================
+  # appended next.
 )

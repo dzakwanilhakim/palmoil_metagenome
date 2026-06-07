@@ -66,10 +66,19 @@ apply_thresholds <- function(tax_filtered, thresholds) {
   out
 }
 
-# Master sample list (the synchronized survivors), per marker
+# Master sample list (the synchronized survivors), per marker.
+# Drops samples with missing/blank fertilizer (cannot enter any A/B/C/D test).
 master_sample_list <- function(thresholded_long) {
-  thresholded_long |>
+  ms <- thresholded_long |>
     dplyr::distinct(marker, id_sampel, stage, field, fertilizer, timepoint)
+  bad <- is.na(ms$fertilizer) |
+         stringr::str_trim(as.character(ms$fertilizer)) %in% c("", "NA")
+  if (any(bad)) {
+    message("master_sample_list: dropped ", sum(bad),
+            " sample(s) with NA/blank fertilizer.")
+    print(ms[bad, c("marker","id_sampel","stage","field","timepoint")])
+  }
+  ms[!bad, , drop = FALSE]
 }
 
 # ----------------------------------------------------------------------------
@@ -114,6 +123,95 @@ write_qc_drop_report <- function(tax_filtered, thresholded_long, thresholds,
   # brief per-marker/reason tally to console
   if (nrow(dropped))
     print(dplyr::count(dropped, marker, reason))
+  out_path
+}
+
+# ----------------------------------------------------------------------------
+# UNIFIED FILTERED-BARCODE REPORT
+#   One CSV per the whole pipeline listing every barcode that was filtered out,
+#   at any stage, with metadata attached where available and the reason.
+#   Reasons:
+#     no_metadata_match     - barcode in matrix but no metadata row
+#     no_matrix_match       - barcode in metadata but no matrix data
+#     flag_qc               - metadata Flag == 1
+#     below_min_depth       - dropped at Stage 3 sample-depth threshold
+#     lost_after_otu_filter - passed depth but emptied by OTU filtering
+#   For barcodes with no metadata, only barcode + marker + reason are written.
+# ----------------------------------------------------------------------------
+write_filtered_barcode_report <- function(long_counts, metadata_all, joined_counts,
+                                          tax_filtered, thresholded, schema, thresholds,
+                                          out_path = "results/filtered_barcodes_all.csv") {
+  dir.create(dirname(out_path), showWarnings = FALSE, recursive = TRUE)
+  registry <- build_sample_registry(metadata_all, schema)
+
+  # helper: metadata lookup per marker keyed by barcode string
+  meta_by_barcode <- purrr::map_dfr(names(schema$marker_columns), function(mk) {
+    bc <- schema$marker_columns[[mk]]$barcode
+    fl <- schema$marker_columns[[mk]]$flag
+    if (!bc %in% names(registry)) return(tibble::tibble())
+    registry |>
+      dplyr::filter(!is.na(.data[[bc]]), .data[[bc]] != "NA") |>
+      dplyr::transmute(marker = mk, barcode = .data[[bc]],
+                       id_sampel, stage, field, fertilizer, timepoint,
+                       extraction_batch,
+                       flag = if (fl %in% names(registry)) .data[[fl]] else NA_character_)
+  })
+
+  matched <- if (nrow(joined_counts))
+    dplyr::distinct(joined_counts, marker, barcode) else
+    tibble::tibble(marker=character(), barcode=character())
+
+  # --- 1. matrix barcodes with NO metadata (Stage 2) ---
+  matrix_bc <- long_counts |> dplyr::distinct(marker, barcode)
+  no_meta <- dplyr::anti_join(matrix_bc, matched, by = c("marker","barcode")) |>
+    dplyr::mutate(reason = "no_metadata_match")
+
+  # --- 2. metadata barcodes with NO matrix (Stage 2) ---
+  no_mat <- dplyr::anti_join(meta_by_barcode, matrix_bc, by = c("marker","barcode")) |>
+    dplyr::mutate(reason = "no_matrix_match")
+
+  # --- 3. flagged at QC (Flag == 1), among joined ---
+  drop_val <- as.character(schema$qc$drop_when_flag_equals)
+  flagged <- joined_counts |>
+    dplyr::distinct(marker, barcode, id_sampel, stage, field, fertilizer,
+                    timepoint, extraction_batch, flag) |>
+    dplyr::filter(!is.na(flag) & as.character(flag) == drop_val) |>
+    dplyr::mutate(reason = "flag_qc")
+
+  # --- 4. dropped at Stage 3 thresholding ---
+  # samples present pre-threshold (tax_filtered) but not in survivors
+  pre <- tax_filtered |>
+    dplyr::group_by(marker, id_sampel, stage, field, fertilizer, timepoint) |>
+    dplyr::summarise(depth = sum(count, na.rm = TRUE), .groups = "drop")
+  survivors <- dplyr::distinct(thresholded, marker, id_sampel)
+  stage3 <- dplyr::anti_join(pre, survivors, by = c("marker","id_sampel")) |>
+    dplyr::rowwise() |>
+    dplyr::mutate(reason = dplyr::if_else(
+      depth < thresholds$markers[[marker]]$min_sample_depth,
+      "below_min_depth", "lost_after_otu_filter")) |>
+    dplyr::ungroup()
+  # attach the barcode for these (from joined_counts)
+  bc_lookup <- joined_counts |> dplyr::distinct(marker, id_sampel, barcode,
+                                                extraction_batch, flag)
+  stage3 <- stage3 |>
+    dplyr::left_join(bc_lookup, by = c("marker","id_sampel"))
+
+  # --- combine, unify columns ---
+  cols <- c("marker","barcode","id_sampel","stage","field","fertilizer",
+            "timepoint","extraction_batch","depth","flag","reason")
+  pad <- function(df) {
+    for (c in setdiff(cols, names(df))) df[[c]] <- NA
+    df[, cols]
+  }
+
+  report <- dplyr::bind_rows(
+    pad(no_meta), pad(no_mat), pad(flagged), pad(stage3)
+  ) |>
+    dplyr::arrange(marker, reason, barcode)
+
+  readr::write_csv(report, out_path)
+  message("Filtered-barcode report: ", nrow(report), " entries -> ", out_path)
+  print(dplyr::count(report, marker, reason))
   out_path
 }
 
