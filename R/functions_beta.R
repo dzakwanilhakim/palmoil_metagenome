@@ -53,9 +53,10 @@ compute_beta <- function(norm_tables, marker, ids, metric) {
 }
 
 # ---- ordination plot --------------------------------------------------------
-# color_var always; shape_var optional (field for C/D). meta has grouping cols.
+# color_var (fertilizer), shape_var (timepoint). facet_var optional (field, D).
+# No ellipses (per spec). 
 plot_ordination <- function(beta, meta, color_var, shape_var = NULL,
-                            pal, title, out_path) {
+                            facet_var = NULL, pal, title, out_path) {
   if (is.null(beta)) return(NA_character_)
   df <- dplyr::left_join(beta$ord, meta, by = "id_sampel")
   ve <- round(100 * beta$var_explained, 1)
@@ -74,34 +75,43 @@ plot_ordination <- function(beta, meta, color_var, shape_var = NULL,
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
                    plot.title = ggplot2::element_text(face = "bold"))
 
-  # 95% ellipse where a color-group has >=4 points
-  if (.can_ellipse(df[[color_var]]))
-    p <- p + ggplot2::stat_ellipse(ggplot2::aes(group = .data[[color_var]]),
-                                   level = .95, linewidth = .4, na.rm = TRUE)
   if (!is.null(shape_var))
     p <- p + ggplot2::scale_shape_manual(
-      values = rep(c(15,16,17,18,3,7,8,9,10,12,13,14), 3)[seq_len(dplyr::n_distinct(df[[shape_var]]))],
+      values = c(16,17,15,18,3,7,8)[seq_len(dplyr::n_distinct(df[[shape_var]]))],
       name = shape_var)
+  if (!is.null(facet_var))
+    p <- p + ggplot2::facet_wrap(stats::as.formula(paste("~", facet_var)),
+                                 scales = "free")
 
-  ggplot2::ggsave(out_path, p, width = 7, height = 5.5, dpi = 200)
+  nf <- if (!is.null(facet_var)) dplyr::n_distinct(df[[facet_var]]) else 1
+  ggplot2::ggsave(out_path, p,
+                  width = max(7, 2.4*ceiling(sqrt(nf))),
+                  height = max(5.5, 2.2*ceiling(sqrt(nf))), dpi = 200,
+                  limitsize = FALSE)
   out_path
 }
 
-# ---- dendrogram (Ward.D2, leaves colored by grouping var) -------------------
+# ---- dendrogram (Ward.D2) — labels colored by fertilizer, timepoint suffix --
+# Bug fix: suppress base plot's own (black) leaf labels via leaflab="none",
+# then draw ONLY our colored mtext labels -> consistent coloring everywhere.
 plot_dendrogram <- function(beta, meta, group_var, pal, title, out_path) {
   if (is.null(beta) || attr(beta$dist, "Size") < 3) return(NA_character_)
   hc <- stats::hclust(beta$dist, method = "ward.D2")
   lab_ids <- hc$labels[hc$order]
-  grp <- meta[[group_var]][match(lab_ids, meta$id_sampel)]
-  cols <- pal[as.character(grp)]; cols[is.na(cols)] <- "grey50"
 
-  grDevices::png(out_path, width = max(1200, 30 * length(lab_ids)),
-                 height = 800, res = 150)
-  op <- graphics::par(mar = c(8, 4, 3, 1))
+  grp <- meta[[group_var]][match(lab_ids, meta$id_sampel)]
+  tp  <- meta$timepoint[match(lab_ids, meta$id_sampel)]
+  cols <- pal[as.character(grp)]; cols[is.na(cols)] <- "grey50"
+  lab_text <- paste0(lab_ids, " (", tp, ")")
+
+  grDevices::png(out_path, width = max(1200, 32 * length(lab_ids)),
+                 height = 850, res = 150)
+  op <- graphics::par(mar = c(10, 4, 3, 1))
   dend <- stats::as.dendrogram(hc)
-  plot(dend, main = title, ylab = "Ward.D2 distance", xlab = "")
-  # color tick labels
-  graphics::mtext(side = 1, at = seq_along(lab_ids), text = lab_ids,
+  # leaflab="none" removes base black labels (the bug source)
+  plot(dend, main = title, ylab = "Ward.D2 distance", xlab = "",
+       leaflab = "none")
+  graphics::mtext(side = 1, at = seq_along(lab_ids), text = lab_text,
                   col = cols, las = 2, line = .5, cex = .6)
   graphics::legend("topright", legend = names(pal), fill = pal, bty = "n", cex = .8)
   graphics::par(op); grDevices::dev.off()
@@ -158,16 +168,14 @@ beta_gate_A <- function(d) {
 # ---- driver: all beta outputs for a subset, into a leaf dir -----------------
 # group_color = fertilizer/timepoint; group_shape = field or NULL
 beta_for_subset <- function(norm_tables, d, marker, leaf, tag,
-                            color_var, shape_var, perm_rhs, strata_var,
+                            color_var, shape_var, facet_var = NULL,
+                            perm_rhs, strata_var,
                             fname_suffix = "",
                             metrics = c("aitchison","bray_curtis","jaccard")) {
   dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
   ids  <- d$id_sampel
   meta <- d
-  pal  <- fert_palette(d$fertilizer)
-  if (color_var == "timepoint")
-    pal <- setNames(scales::hue_pal()(dplyr::n_distinct(d$timepoint)),
-                    sort(unique(d$timepoint)))
+  pal  <- fert_palette(d$fertilizer)   # dendrogram + color always by fertilizer
   sfx <- if (nzchar(fname_suffix)) paste0("_", fname_suffix) else ""
 
   written <- character(0); perm_rows <- list()
@@ -175,12 +183,12 @@ beta_for_subset <- function(norm_tables, d, marker, leaf, tag,
     beta <- compute_beta(norm_tables, marker, ids, met)
     if (is.null(beta)) next
 
-    o <- plot_ordination(beta, meta, color_var, shape_var, pal,
+    o <- plot_ordination(beta, meta, color_var, shape_var, facet_var, pal,
           title = paste0(tag, " — ", met, " ordination"),
           out_path = file.path(leaf, paste0("beta_ord_", met, sfx, ".png")))
     if (!is.na(o)) written <- c(written, o)
 
-    g <- plot_dendrogram(beta, meta, color_var, pal,
+    g <- plot_dendrogram(beta, meta, "fertilizer", pal,
           title = paste0(tag, " — ", met, " dendrogram (Ward.D2)"),
           out_path = file.path(leaf, paste0("beta_dendro_", met, sfx, ".png")))
     if (!is.na(g)) written <- c(written, g)
@@ -207,54 +215,27 @@ build_beta_tree <- function(alpha_df, norm_tables, root = "Results") {
     udir  <- file.path(root, ucode)
     d_u   <- dplyr::filter(alpha_df, marker == mk, stage == st)
     if (nrow(d_u) == 0) next
-    message("=== BETA universe ", ucode, " ===")
+    message("=== BETA universe ", ucode, " (B & D only) ===")
     fields <- sort(unique(d_u$field))
 
-    ## Goal A — gated, per field x timepoint, ~fertilizer
-    for (fld in fields) {
-      dsub_f <- dplyr::filter(d_u, field == fld)
-      for (tp in sort(unique(dsub_f$timepoint))) {
-        dsub <- dplyr::filter(dsub_f, timepoint == tp)
-        if (!beta_gate_A(dsub)) next   # strict gate; skip silently
-        leaf <- file.path(udir, GOAL_DIR["A"], fld)
-        w <- beta_for_subset(norm_tables, dsub, mk, leaf,
-              tag = paste0(ucode," A ",fld," ",tp),
-              color_var = "fertilizer", shape_var = NULL,
-              perm_rhs = "fertilizer", strata_var = NULL,
-              fname_suffix = tp)
-        written <- c(written, w)
-      }
-    }
-
-    ## Goal B — per field, ordination colored by timepoint, ~timepoint
+    ## Goal B — per field; color=fertilizer, shape=timepoint; PERMANOVA ~timepoint
     for (fld in fields) {
       dsub <- dplyr::filter(d_u, field == fld)
-      if (dplyr::n_distinct(dsub$timepoint) < 2) next
+      if (dplyr::n_distinct(dsub$timepoint) < 2 && nrow(dsub) < 3) next
       leaf <- file.path(udir, GOAL_DIR["B"], fld)
       w <- beta_for_subset(norm_tables, dsub, mk, leaf,
             tag = paste0(ucode," B ",fld),
-            color_var = "timepoint", shape_var = NULL,
+            color_var = "fertilizer", shape_var = "timepoint", facet_var = NULL,
             perm_rhs = "timepoint", strata_var = NULL)
       written <- c(written, w)
     }
 
-    ## Goal C — pooled per timepoint, color=fertilizer shape=field, strata=field
-    leafC <- file.path(udir, GOAL_DIR["C"])
-    for (tp in sort(unique(d_u$timepoint))) {
-      dsub <- dplyr::filter(d_u, timepoint == tp)
-      sub_leaf <- file.path(leafC, paste0("timepoint_", tp))
-      w <- beta_for_subset(norm_tables, dsub, mk, sub_leaf,
-            tag = paste0(ucode," C ",tp),
-            color_var = "fertilizer", shape_var = "field",
-            perm_rhs = "fertilizer", strata_var = "field")
-      written <- c(written, w)
-    }
-
-    ## Goal D — all data, color=fertilizer shape=field, ~timepoint+fertilizer strata=field
+    ## Goal D — all data; color=fertilizer, shape=timepoint, FACET by field;
+    ##          PERMANOVA ~timepoint+fertilizer, strata=field
     leafD <- file.path(udir, GOAL_DIR["D"])
     w <- beta_for_subset(norm_tables, d_u, mk, leafD,
           tag = paste0(ucode," D"),
-          color_var = "fertilizer", shape_var = "field",
+          color_var = "fertilizer", shape_var = "timepoint", facet_var = "field",
           perm_rhs = "timepoint + fertilizer", strata_var = "field")
     written <- c(written, w)
   }

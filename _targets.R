@@ -125,8 +125,17 @@ list(
   # beta diversity (ordinations, dendrograms, PERMANOVA) into the same tree
   tar_target(beta_tree, build_beta_tree(alpha_div, norm_tables,
                                         root = "Results"),
+             format = "file"),
+
+  # relative abundance stacked bars (Goal B per field, Goal D pooled)
+  tar_target(relabund_tree, build_relabund_tree(thresholded, norm_tables,
+                                                master_samples, root = "Results",
+                                                top_ns = c(10, 15)),
+             format = "file"),
+
+  # replicate-count tables per field (post-QC) -> Results/data_counts/<universe>/
+  tar_target(count_tables, build_count_tables(master_samples, root = "Results"),
              format = "file")
 
-  # ===== STAGE 4 cont. (relative abundance / stacked bars) =================
-  # appended next.
+  # ===== STAGE 4 COMPLETE ==================================================
 )
