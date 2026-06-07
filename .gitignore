@@ -8,7 +8,7 @@ renv/cellar/
 renv/staging/
 renv/python/
 renv/sandbox/
-# (renv.lock and renv/activate.R + renv/settings.json are tracked)
+# (renv.lock + renv/activate.R + renv/settings.json ARE tracked)
 
 # --- R session cruft ---
 .Rhistory
@@ -17,12 +17,18 @@ renv/sandbox/
 *.Rproj
 .Ruserdata
 
+# --- rendered notebook/report artifacts (regenerable) ---
+pipeline.html
+pipeline_files/
+*_files/
+*.html
+
 # --- generated outputs (regenerable from the pipeline) ---
 results/
+Results/
 data/processed/
 
-# --- raw data (large; lives on /mnt or is delivered separately) ---
-# Comment this out if you DO want raw data versioned.
+# --- raw data (large; lives on /mnt, delivered separately) ---
 data/raw/
 
 # --- OS / editor noise ---
