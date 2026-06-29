@@ -7,7 +7,8 @@ library(targets)
 library(tarchetypes)
 
 tar_option_set(
-  packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork", "permute"),
+  packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork", "permute",
+               "igraph", "ggraph", "pheatmap"),
   format   = "rds"     # default; long_qc overridden to parquet below
 )
 
@@ -27,15 +28,14 @@ list(
              format = "file"),
 
   tar_target(mat_files_16s,
-             list.files("data/raw/raw_mat_16s",
-                        pattern = "\\.tsv$", full.names = TRUE),
-             format = "file"),
+            list.files("data/raw/raw_mat_16s",
+                        pattern = "_(genus|phylum)\\.tsv$", full.names = TRUE),
+            format = "file"),
 
   tar_target(mat_files_its,
-             list.files("data/raw/raw_mat_its",
-                        pattern = "\\.tsv$", full.names = TRUE),
-             format = "file"),
-
+            list.files("data/raw/raw_mat_its",
+                        pattern = "_(genus|phylum)\\.tsv$", full.names = TRUE),
+            format = "file"),
   # ---- compile ------------------------------------------------------------
   tar_target(metadata_all, compile_metadata(meta_files, schema)),
 
@@ -135,7 +135,13 @@ list(
 
   # replicate-count tables per field (post-QC) -> Results/data_counts/<universe>/
   tar_target(count_tables, build_count_tables(master_samples, root = "Results"),
+             format = "file"),
+
+  # ===== STAGE 5 — Co-occurrence networks + Active Keystone identification =
+  tar_target(network_tree,
+             build_network_tree(norm_tables, master_samples,
+                                root = "Results"),
              format = "file")
 
-  # ===== STAGE 4 COMPLETE ==================================================
+  # ===== STAGE 5 COMPLETE ==================================================
 )
