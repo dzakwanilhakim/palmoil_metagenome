@@ -1,0 +1,14 @@
+name: palmoil
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - r-base=4.5
+  - r-renv
+  - libxml2
+  - gsl
+  - udunits2
+  - glpk
+  - zlib
+  - bzip2
+  - xz

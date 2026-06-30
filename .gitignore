@@ -1,0 +1,40 @@
+# --- targets pipeline cache (regenerable; can be large) ---
+_targets/
+
+# --- renv: ignore the library, KEEP renv.lock + settings ---
+renv/library/
+renv/local/
+renv/cellar/
+renv/staging/
+renv/python/
+renv/sandbox/
+# (renv.lock + renv/activate.R + renv/settings.json ARE tracked)
+
+# --- R session cruft ---
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj
+.Ruserdata
+
+# --- rendered notebook/report artifacts (regenerable) ---
+pipeline.html
+pipeline_files/
+*_files/
+*.html
+
+# --- generated outputs (regenerable from the pipeline) ---
+results/
+Results/
+data/processed/
+
+# --- raw data (large; lives on /mnt, delivered separately) ---
+data/raw/
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~

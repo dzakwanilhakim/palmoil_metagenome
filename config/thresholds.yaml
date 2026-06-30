@@ -1,0 +1,21 @@
+# =============================================================================
+# thresholds.yaml — QC cutoffs chosen after pre-QC assessment (Stage 3, Step 2)
+# Read by Steps 3-5. Change here + re-run tar_make() to re-filter.
+# Rarefaction depth defaults to the minimum surviving sample depth per marker
+# (set rarefy_depth: null to auto, or an integer to force a value).
+# =============================================================================
+markers:
+  "16S":
+    min_sample_depth: 50000     # drop samples below this total read depth
+    otu_min_reads:    10        # drop OTUs with global total reads < this
+    prevalence_frac:  0.05      # drop OTUs present in < 5% of surviving samples
+    rarefy_depth:     null      # null = min surviving depth (~52,607)
+  "ITS":
+    min_sample_depth: 10000
+    otu_min_reads:    10
+    prevalence_frac:  0.05
+    rarefy_depth:     null      # null = min surviving depth (~16,376)
+
+# CLR settings
+clr:
+  pseudocount: 1                # added to all counts before log-ratio

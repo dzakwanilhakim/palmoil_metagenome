@@ -1,0 +1,5 @@
+```{r}
+summary(cars)
+install.packages("IRkernel")
+IRkernel::installspec()
+```
