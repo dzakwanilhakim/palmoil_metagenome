@@ -363,20 +363,26 @@ run_rank_keystone <- function(clr_sub, meta, rank, leaf, tag,
   written <- c(written, resG$written)
 
   # ---- SPECIES track (own network, own keystones) -------------------------
+  message("    [SPECIES gate] species_long=",
+          if (is.null(species_long)) "NULL" else paste0(nrow(species_long), " rows"),
+          " | marker=", if (is.null(marker)) "NULL" else marker,
+          " | stage=", if (is.null(stage)) "NULL" else stage)
   if (!is.null(species_long) && !is.null(marker) && !is.null(stage)) {
+    # capture genus_map BEFORE subsetting (subsetting drops attributes)
     sp_clr <- species_clr_for_ids(species_long, meta_full$id_sampel, marker, stage)
     if (!is.null(sp_clr)) {
-      # align species CLR rows to the same samples present in genus subset
+      gmap   <- attr(sp_clr, "genus_map")
       common <- intersect(rownames(sp_clr), meta_full$id_sampel)
       sp_clr <- sp_clr[common, , drop = FALSE]
-      gmap <- attr(sp_clr, "genus_map")  # preserve attr after subsetting
-      attr(sp_clr, "genus_map") <- gmap
+      attr(sp_clr, "genus_map") <- gmap   # re-attach after subsetting
+      message("    [SPECIES] running network: ", length(common),
+              " samples, ", ncol(sp_clr), " species")
       resS <- run_rank_keystone(sp_clr,
                 meta_full[meta_full$id_sampel %in% common, , drop = FALSE],
                 "species", leaf, tag, r_thresh = r_thresh)
       written <- c(written, resS$written)
     } else {
-      message("    species CLR NULL for ", tag)
+      message("    [SPECIES] CLR NULL for ", tag)
     }
   }
 

@@ -12,6 +12,120 @@ suppressPackageStartupMessages({ library(tidyverse) })
 
 UNCLASS_RX <- "(?i)^unclassified|^unassigned|^unknown|_incertae_sedis$|^$|^NA$"
 
+# ---- SPECIES INGEST (parallel to genus, restricted to master samples) -------
+# Reads wf_<marker>_batch_N_species.tsv, melts, joins to master_samples by the
+# barcode string (same join logic as genus). Returns long: marker, id_sampel,
+# stage, field, fertilizer, timepoint, species, genus (from lineage), count.
+load_species_long <- function(species_files, metadata_all, master_samples,
+                              schema) {
+  if (length(species_files) == 0) {
+    message("load_species_long: no species files found."); return(tibble::tibble())
+  }
+  message("load_species_long: ", length(species_files), " species files.")
+  registry <- build_sample_registry(metadata_all, schema)
+
+  long <- purrr::map_dfr(species_files, function(f) {
+    info <- tryCatch(parse_matrix_filename(f, schema), error = function(e) NULL)
+    if (is.null(info) || info$rank != "species") {
+      message("  skip (name/rank): ", basename(f)); return(tibble::tibble())
+    }
+    mat <- readr::read_tsv(f, show_col_types = FALSE,
+                           name_repair = "minimal", progress = FALSE)
+    # taxon label column: prefer "species"; else last taxonomy-ish text column
+    label_col <- if ("species" %in% names(mat)) "species" else NA_character_
+    if (is.na(label_col)) {
+      message("  skip (no 'species' column): ", basename(f),
+              " | cols: ", paste(utils::head(names(mat), 6), collapse=", "))
+      return(tibble::tibble())
+    }
+    keep_tax <- intersect(c("tax"), names(mat))
+    sample_cols <- setdiff(names(mat), schema$join$non_sample_columns)
+    sample_cols <- setdiff(sample_cols, c(label_col, "species"))
+    mat |>
+      dplyr::select(dplyr::all_of(c(label_col, keep_tax, sample_cols))) |>
+      dplyr::rename(species = !!label_col) |>
+      tidyr::pivot_longer(dplyr::all_of(sample_cols),
+                          names_to = "barcode", values_to = "count") |>
+      dplyr::mutate(marker = info$marker, count = as.numeric(count))
+  })
+  if (nrow(long) == 0) {
+    message("load_species_long: no species rows after read."); return(tibble::tibble())
+  }
+
+  markers <- names(schema$marker_columns)
+  joined <- purrr::map_dfr(markers, function(mk) {
+    bc <- schema$marker_columns[[mk]]$barcode
+    if (!bc %in% names(registry)) return(tibble::tibble())
+    meta_mk <- registry |>
+      dplyr::filter(!is.na(.data[[bc]]), .data[[bc]] != "NA") |>
+      dplyr::transmute(marker = mk, barcode = .data[[bc]], id_sampel)
+    dplyr::inner_join(dplyr::filter(long, marker == mk), meta_mk,
+                      by = c("marker", "barcode"))
+  })
+  if (nrow(joined) == 0) {
+    message("load_species_long: 0 barcodes matched metadata."); return(tibble::tibble())
+  }
+
+  joined <- joined |>
+    dplyr::mutate(genus = stringr::str_trim(
+                    stringr::str_split_fixed(tax, ";", 8)[, 7]))
+
+  out <- dplyr::inner_join(joined,
+    dplyr::select(master_samples, marker, id_sampel, stage, field,
+                  fertilizer, timepoint),
+    by = c("marker", "id_sampel"))
+  message("load_species_long: ", dplyr::n_distinct(out$id_sampel, out$marker),
+          " sample-units, ", nrow(out), " rows.")
+  out
+}
+
+# ---- SPECIES stacked bar for one subset --------------------------------------
+# 1) find Top-N genera in THIS subset (by mean rel abundance, genus level)
+# 2) keep only species whose parent genus is in that Top-N
+# 3) Top-N species + "Other"; mean rel abundance per (fertilizer, timepoint)
+species_bar_df <- function(sp_long, genus_long, gp_map, marker, top_n = 15) {
+  # Top-N genera for this subset (reuse the genus mean-relabund Top-N logic)
+  g_top <- mean_relabund(genus_long, gp_map, marker, "genus",
+                         group_cols = c("fertilizer","timepoint"),
+                         top_n = top_n, exclude_unclassified = TRUE, full = FALSE)
+  top_genera <- setdiff(unique(g_top$taxon), "Other")
+
+  # keep species within the Top-N genera
+  d <- dplyr::filter(sp_long, genus %in% top_genera)
+  message("  species_bar_df: ", length(top_genera), " top genera, ",
+          dplyr::n_distinct(d$species), " species matched (",
+          nrow(d), " rows)")
+  d$taxon <- d$species
+  d$taxon[is.na(d$taxon) | d$taxon == ""] <- "Unclassified"
+
+  # AGGREGATE per (sample, species) FIRST to collapse any duplicate rows
+  # (same species via multiple barcodes/lineage variants) -> prevents >100%.
+  per_ss <- d |>
+    dplyr::group_by(fertilizer, timepoint, id_sampel, taxon) |>
+    dplyr::summarise(count = sum(count, na.rm = TRUE), .groups = "drop")
+
+  # per-sample proportion within the Top-genera species set (sums to 100%)
+  per_sample <- per_ss |>
+    dplyr::group_by(fertilizer, timepoint, id_sampel) |>
+    dplyr::mutate(samp_total = sum(count),
+                  rel = ifelse(samp_total > 0, count / samp_total, 0)) |>
+    dplyr::ungroup()
+
+  grp_mean <- per_sample |>
+    dplyr::group_by(fertilizer, timepoint, taxon) |>
+    dplyr::summarise(mean_rel = mean(rel), .groups = "drop")
+
+  grp_mean <- dplyr::filter(grp_mean, !stringr::str_detect(taxon, UNCLASS_RX))
+  top_sp <- grp_mean |> dplyr::group_by(taxon) |>
+    dplyr::summarise(t = sum(mean_rel), .groups = "drop") |>
+    dplyr::slice_max(t, n = top_n) |> dplyr::pull(taxon)
+
+  grp_mean |>
+    dplyr::mutate(taxon = ifelse(taxon %in% top_sp, taxon, "Other")) |>
+    dplyr::group_by(fertilizer, timepoint, taxon) |>
+    dplyr::summarise(mean_rel = sum(mean_rel), .groups = "drop")
+}
+
 # genus -> phylum map from the thresholded long table (carries `tax` lineage)
 # lineage: superkingdom;kingdom;phylum;class;order;family;genus
 build_genus_phylum_map <- function(thresholded_long) {
@@ -84,8 +198,11 @@ mean_relabund <- function(long, gp_map, marker, rank, group_cols,
 }
 
 # stacked bar: x=fertilizer, facet=timepoint, fill=taxon
-plot_stacked_bar <- function(plot_df, rank, title, out_path) {
+plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL) {
   if (nrow(plot_df) == 0) return(NA_character_)
+  # fixed fertilizer x-axis if provided
+  if (!is.null(all_ferts))
+    plot_df$fertilizer <- factor(plot_df$fertilizer, levels = all_ferts)
   # GLOBAL order: rank taxa by total mean abundance across all groups in plot.
   # ggplot stacks the FIRST factor level at the TOP, so to put "Other" on top
   # we make it the first level, followed by taxa in ascending abundance
@@ -105,6 +222,7 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path) {
   p <- ggplot2::ggplot(plot_df,
         ggplot2::aes(fertilizer, mean_rel, fill = taxon)) +
     ggplot2::geom_col(width = .8, colour = "grey30", linewidth = .1) +
+    ggplot2::scale_x_discrete(drop = FALSE) +
     ggplot2::scale_fill_manual(values = pal, name = stringr::str_to_title(rank),
                                breaks = legend_levels) +
     ggplot2::scale_y_continuous(labels = scales::percent_format(),
@@ -143,6 +261,7 @@ build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
     if (nrow(long) == 0) next
     message("=== RELABUND universe ", ucode, " ===")
     fields <- sort(unique(long$field))
+    all_ferts <- fert_rows_for_stage(st)   # PH1-6 (TM) or PHN01-13 (Nursery)
 
     for (rank in c("phylum", "genus")) {
 
@@ -160,7 +279,8 @@ build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
           w <- plot_stacked_bar(plt, rank,
                  title = paste0(ucode," — Goal B — ",fld," — ",rank," (Top ",tn,")"),
                  out_path = file.path(leaf,
-                   paste0("stackbar_", rank, "_top", tn, "_", fld, ".png")))
+                   paste0("stackbar_", rank, "_top", tn, "_", fld, ".png")),
+                 all_ferts = all_ferts)
           if (!is.na(w)) written <- c(written, w)
         }
         full <- mean_relabund(lf, gp_map, mk, rank,
@@ -179,7 +299,8 @@ build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
         wD <- plot_stacked_bar(pltD, rank,
                title = paste0(ucode," — Goal D (pooled) — ",rank," (Top ",tn,")"),
                out_path = file.path(leafD,
-                 paste0("stackbar_", rank, "_top", tn, "_pooled.png")))
+                 paste0("stackbar_", rank, "_top", tn, "_pooled.png")),
+               all_ferts = all_ferts)
         if (!is.na(wD)) written <- c(written, wD)
       }
       fullD <- mean_relabund(long, gp_map, mk, rank,
@@ -189,5 +310,68 @@ build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
     }
   }
   message("Relabund tree complete: ", length(written), " plots.")
+  written
+}
+
+# ============================================================================
+# SPECIES stacked bars (Goal B per field, Goal D pooled) — Top-15 only
+#   Top-15 genera computed per-plot; species filtered to those genera; then
+#   Top-15 species + "Other". Same samples as genus QC (master list).
+# ============================================================================
+build_species_tree <- function(thresholded_long, norm_tables, master_samples,
+                                species_long, root = "Results", top_n = 15) {
+  if (nrow(species_long) == 0) {
+    message("No species data ingested; skipping species bars."); return(character(0))
+  }
+  gp_map <- build_genus_phylum_map(thresholded_long)
+  universes <- master_samples |> dplyr::distinct(marker, stage) |>
+    dplyr::filter(!is.na(stage)) |> dplyr::arrange(marker, stage)
+  written <- character(0)
+
+  for (u in seq_len(nrow(universes))) {
+    mk <- universes$marker[u]; st <- universes$stage[u]
+    ucode <- paste0(mk, "_", st)
+    udir  <- file.path(root, ucode)
+
+    g_long <- rarefied_long(norm_tables, master_samples, mk)
+    g_long <- dplyr::filter(g_long, stage == st)
+    sp_u <- dplyr::filter(species_long, marker == mk, stage == st)
+    if (nrow(g_long) == 0 || nrow(sp_u) == 0) next
+    message("=== SPECIES bars ", ucode, " ===")
+    fields <- sort(unique(g_long$field))
+    all_ferts <- fert_rows_for_stage(st)
+
+    ## Goal B — per field
+    for (fld in fields) {
+      gl <- dplyr::filter(g_long, field == fld)
+      sl <- dplyr::filter(sp_u,  field == fld)
+      if (nrow(sl) == 0) next
+      leaf <- file.path(udir, "Goal_B_Intra_Longitudinal", fld)
+      dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
+      df <- species_bar_df(sl, gl, gp_map, mk, top_n)
+      w <- plot_stacked_bar(df, "species",
+            title = paste0(ucode," — Goal B — ",fld," — species (Top ",top_n,
+                           ", within Top ",top_n," genera)"),
+            out_path = file.path(leaf, paste0("stackbar_species_top",top_n,"_",fld,".png")),
+            all_ferts = all_ferts)
+      if (!is.na(w)) written <- c(written, w)
+      readr::write_csv(df, file.path(leaf,
+            paste0("relabund_species_top",top_n,"_",fld,".csv")))
+    }
+
+    ## Goal D — pooled
+    leafD <- file.path(udir, "Goal_D_Cross_Longitudinal")
+    dir.create(leafD, recursive = TRUE, showWarnings = FALSE)
+    dfD <- species_bar_df(sp_u, g_long, gp_map, mk, top_n)
+    wD <- plot_stacked_bar(dfD, "species",
+           title = paste0(ucode," — Goal D (pooled) — species (Top ",top_n,
+                          ", within Top ",top_n," genera)"),
+           out_path = file.path(leafD, paste0("stackbar_species_top",top_n,"_pooled.png")),
+           all_ferts = all_ferts)
+    if (!is.na(wD)) written <- c(written, wD)
+    readr::write_csv(dfD, file.path(leafD,
+           paste0("relabund_species_top",top_n,"_pooled.csv")))
+  }
+  message("Species bar tree complete: ", length(written), " plots.")
   written
 }

@@ -8,7 +8,7 @@ library(tarchetypes)
 
 tar_option_set(
   packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork", "permute",
-               "igraph", "ggraph", "pheatmap"),
+               "igraph", "ggraph", "pheatmap", "ggrepel"),
   format   = "rds"     # default; long_qc overridden to parquet below
 )
 
@@ -137,10 +137,28 @@ list(
   tar_target(count_tables, build_count_tables(master_samples, root = "Results"),
              format = "file"),
 
+  # species matrices (separate files) -> species long restricted to master
+  tar_target(species_files,
+             list.files(c("data/raw/raw_mat_16s", "data/raw/raw_mat_its"),
+                        pattern = "_species\\.tsv$", full.names = TRUE),
+             format = "file"),
+  tar_target(species_long,
+             load_species_long(species_files, metadata_all, master_samples, schema)),
+
   # ===== STAGE 5 — Co-occurrence networks + Active Keystone identification =
   tar_target(network_tree,
-             build_network_tree(norm_tables, master_samples,
+             build_network_tree(norm_tables, master_samples, species_long,
                                 root = "Results"),
+             format = "file"),
+
+  # ===== RAW EXPORTS — dated aggregated CSVs (no QC/filtering) =============
+  tar_target(raw_exports,
+             export_raw_data(schema,
+                             mat_dirs  = c("data/raw/raw_mat_16s",
+                                           "data/raw/raw_mat_its"),
+                             meta_dirs = c("data/raw/metadata_16s",
+                                           "data/raw/metadata_its"),
+                             out_dir   = "Results/raw_exports"),
              format = "file")
 
   # ===== STAGE 5 COMPLETE ==================================================
