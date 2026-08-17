@@ -24,14 +24,28 @@ load_species_long <- function(species_files, metadata_all, master_samples,
   message("load_species_long: ", length(species_files), " species files.")
   registry <- build_sample_registry(metadata_all, schema)
 
+  # parse marker/rank DIRECTLY from filename (independent of schema regex,
+  # which may be stale). e.g. wf_16s_batch_1_species.tsv -> marker=16S
+  parse_species_fn <- function(path) {
+    b <- basename(path)
+    m <- regmatches(b, regexec(
+      "wf_(16s|its)_batch_([0-9]+)_species\\.tsv", b))[[1]]
+    if (length(m) < 3) return(NULL)
+    list(marker = toupper(m[2]), seq_batch = m[3])
+  }
+  # non-sample (lineage) columns; fall back to a built-in set if schema lacks it
+  ns_cols <- if (!is.null(schema$join$non_sample_columns))
+    schema$join$non_sample_columns else
+    c("genus","phylum","species","class","order","family","tax","total",
+      "superkingdom","kingdom")
+
   long <- purrr::map_dfr(species_files, function(f) {
-    info <- tryCatch(parse_matrix_filename(f, schema), error = function(e) NULL)
-    if (is.null(info) || info$rank != "species") {
-      message("  skip (name/rank): ", basename(f)); return(tibble::tibble())
+    info <- parse_species_fn(f)
+    if (is.null(info)) {
+      message("  skip (name): ", basename(f)); return(tibble::tibble())
     }
     mat <- readr::read_tsv(f, show_col_types = FALSE,
                            name_repair = "minimal", progress = FALSE)
-    # taxon label column: prefer "species"; else last taxonomy-ish text column
     label_col <- if ("species" %in% names(mat)) "species" else NA_character_
     if (is.na(label_col)) {
       message("  skip (no 'species' column): ", basename(f),
@@ -39,7 +53,7 @@ load_species_long <- function(species_files, metadata_all, master_samples,
       return(tibble::tibble())
     }
     keep_tax <- intersect(c("tax"), names(mat))
-    sample_cols <- setdiff(names(mat), schema$join$non_sample_columns)
+    sample_cols <- setdiff(names(mat), ns_cols)
     sample_cols <- setdiff(sample_cols, c(label_col, "species"))
     mat |>
       dplyr::select(dplyr::all_of(c(label_col, keep_tax, sample_cols))) |>

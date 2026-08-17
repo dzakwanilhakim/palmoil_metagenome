@@ -1,0 +1,9 @@
+# =============================================================================
+# gold_qc_thresholds.yaml — TASK 3 read-depth cutoffs for gold_qc reads_status
+#   HIGH if Reads (from silver_wf_runs) >= cutoff for that marker, else LOW.
+#   Defaults reuse the same min_sample_depth values already vetted in
+#   config/thresholds.yaml (Stage 3 QC) for consistency across the project.
+# =============================================================================
+reads_cutoff:
+  "16S": 50000
+  ITS:   10000

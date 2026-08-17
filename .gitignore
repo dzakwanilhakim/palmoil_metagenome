@@ -1,5 +1,6 @@
 # --- targets pipeline cache (regenerable; can be large) ---
 _targets/
+.data_old/
 
 # --- renv: ignore the library, KEEP renv.lock + settings ---
 renv/library/
@@ -29,7 +30,7 @@ Results/
 data/processed/
 
 # --- raw data (large; lives on /mnt, delivered separately) ---
-data/raw/
+data/
 
 # --- OS / editor noise ---
 .DS_Store

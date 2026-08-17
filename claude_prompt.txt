@@ -1,0 +1,60 @@
+TASK 1: metadata_prep
+1. Reads data/source/<date>_metadata.xlsx
+2. Filter out first row, use second row as headers
+BRONZE:
+3. Select column as a dataframe (bronze):
+- "No/Kode Sampel" {224, 225, 1, ...), 
+- "Nama Sampel" {PAS-PHN10-T1-07-SSUM,  AT-PH3-T1-08-SSUM, TPP-OL0002-PH1-T0-06-SSUM, ...},,
+- "Jenis Kebun" {Nursery,TM},
+- "Jenis Analisis" {16S + ITS, 16S, ITS},
+- "Batch Ekstraksi" {9 (31/07/2026), 8 (08/07/2026)},
+- output: data/bronze/bronze_metadata.csv
+
+Silver:
+4. Process:
+- Filter out rows if "Batch Ekstraksi" is empty or NA
+- Make df$"Batch Ekstraksi" and df$Date Ekstraksi from "Batch Ekstraksi", example 9 (31/07/2026) to batch 9 and date 31/07/2026, convert to format YYMMDD
+
+5. QC Per Column
+-"No/Kode Sampel":  make sure there is no NA, empty, and duplicate, and integer only
+-"Nama Sampel": make sure there is no NA, empty, and duplicate
+-"Jenis Kebun": make sure there is no no NA, empty, only 2 unique, Nursery or TM
+-"Jenis Analisis": make sure there is no no NA, empty, only 3 unique, 16S, ITS, 16S + ITS
+-"Batch Ekstraksi", "Data Ekstraksi" : make sure there is no no NA, empty
+
+6.Create column "Kode Kebun": retrieve all character from first underscore character "_" from "Nama Sampel", ex GSDI-PHN04-T0-06-SSUM the Kode Kebun is GSDI, 
+7.Create column "Kode Pupuk": retrieve all character if the regex pattern is "-PHX-" or "-PHNXX-" from "Nama Sampel, ex AMR-PH1-T2-06-SSUM, GSDI-PHN12-T2-05-SSUM, and TPP-OL0002-PH1-T0-06-SSUM, the kode pupuk respectively is  PH1, PHN12 and PH1, if there was no kode kebun like -PHN- or -PH- or dont have the pattern, just set NA and give warning "2 sample dont have Kode Kebun"
+8.Create column "Waktu": retrieve all character if the regex pattern is -TX- from "Nama Sampel", ex AMR-PH1-T2-06-SSUM, GSDI-PHN12-T2-05-SSUM, and TPP-OL0002-PH1-T0-06-SSUM, respectively is T2, T2, T0. if there was no Waktu like -T- or dont have the pattern, just set NA and give warning "2 sample dont have Waktu"
+9.Create column "16S" and "ITS". from "Jenis Analisis" set 0 for absence, or 1 for presence analysis. like IF 16S in jenis analisis so 1 for 16S and 0 for ITS vice versa,if 16S + ITS set 1 and 1 for both 16S ITS
+10. Split to metadata_16s and metadata_its
+11. output data/silver/silver_metadata_16s.csv and data/silver/silver_metadata_its.csv
+
+
+TASK 2: abundance_matrix_prep
+BRONZE:
+1. Reads and iterate to each 16S wf html output like wf_16s_batch_9.html and its  wf html output wf_its_batch_6.html
+2. Scrape the html for date, Number of reads {Sample alias,Reads,Unclassified|Unmapped,Unclassified|Unmapped (%)} 
+ - From Sample alias {barcode01_19, barcode23_169, ..}, make column "No/Kode Sampel" that retrieve all character after underscore, so barcode01_19 the No/Kode Sampel is 19
+ - create bronze/bronze_wf_runs_16s.csv and bronze/wf_runs_its.csv with column No/Kode Sampel,Sample alias,date run,Reads,Unclassified|Unmapped,Unclassified|Unmapped (%) merge for all 16S and ITS
+3. click download the abundance matrix .csv for Taxonomy phylum, genus, and species
+ - from the matrix, if there was Sample alias that not contained in the matrix but contained in wf runs, create the new sample (make sure add new column or row?) that all value is 0, so at the end we get all Sample alias (like barcode01_23) is contained in matrix,vice versa
+ - create bronze/bronze_matrix_16s_{kingdom/phylum/genus}.csv and bronze/bronze_matrix_its_{kingdom/phylum/genus/species}.csv,that merge all abundance matrix, if the cell empty just set to 0
+
+Silver:
+1. from bronze_wf_runs_16s, and bronze_wf_runs_its, if there was duplicate based on No/Kode Sampel, dedup based on date, pick 1 latest sample, else drop, output /data/silver/silver_wf_runs_16s.csv /data/silver/silver_wf_runs_its.csv
+2. from bronze matrix, synchronize the dropped sample to /data/silver/silver_matrix_16s_{kingdom/phylum/genus/species}.csv /data/silver/silver_matrix_its_{kingdom/phylum/genus}.csv
+
+
+Task 3: metadata_matrix
+GOLD:
+1. join datafarme. cbind all column of the silver_wf_runs_16s or silver_wf_runs_itss column to  silver_metadata_16s.csv or silver_metadata_its.csv, based on key No/Kode Sampel. 
+2. if the key not found in the wf runs, set to NA. if the key not found in the metadata, also set others to NA. create flag column = 1, else 0.
+3. create reads_status HIGH if the reads total >= 16s_reads_cutoff or its_reads_cutoff, else if < cut off so set LOW. (cut off is in /config )
+4. create qc_status if FLAG == 1 set NOT COMPLETE, if FLAG == 0, if reads status HIGH, so HIGH PASS, else if FLAG == 0 and reads status LOW, so LOW PASS. 
+5. create recommendation column for not HIGH PASS, like RESEQUENCING for LOW PASS, or RESEQUENCING;CLARIFY for NOT COMPLETE and LOW, or just NOT COMPLETE
+4. output is /data/gold/gold_qc_16s.csv or gold_qc_its, synchronize the silver matrix 16s and its, only keep sample that HIGH PASS based on ye Sample alias at matrix 16s/its kingdom/phylum/genus/species
+5. output is /data/gold/gold_matrix_{16s/ots}_{kingdom/phylum/genus/species}.csv
+6. create /data/gold/recommendation_{16s/its}.csv that is subset of gold_qc that NOT HIGH PASS
+
+
+
