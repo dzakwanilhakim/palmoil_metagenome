@@ -1,0 +1,7 @@
+# =============================================================================
+# plot_style.yaml — shared ggplot styling for Dashboard + Analysis output
+#   plots (per project note: "increase the font size, bold, and set in config")
+# =============================================================================
+base_size: 15
+bold_titles: true
+bold_axis_text: true

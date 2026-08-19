@@ -4,7 +4,9 @@
 #   Results/<MARKER>_<STAGE>/Goal_{A,B,C,D}.../[FIELD]/  plots + sliced CSVs
 #
 #   - dynamic fertilizer palette via scales::hue_pal() (handles >=13)
-#   - n=1 groups -> single dot (no flat boxplot) GLOBALLY
+#   - Goal A/C default (chart_type="box"): n=1 groups -> single dot (no flat
+#     boxplot); chart_type="bar" (used by the gold pipeline) -> mean bar +
+#     SD error bar instead, error bar only drawn when n>1
 #   - trajectory lines = MEDIAN per fertilizer per timepoint (colored)
 #   - embedded dynamic p-value tables (consecutive-timepoint raw Wilcoxon,
 #     rows = Overall + each fertilizer, cols = T0vsT1, T1vsT2, ...)
@@ -39,8 +41,8 @@ list_universes <- function(alpha_df) {
     dplyr::filter(!is.na(stage)) |> dplyr::arrange(marker, stage)
 }
 
-.alpha_long_u <- function(d) {
-  tidyr::pivot_longer(d, c(Observed, Pielou, Shannon),
+.alpha_long_u <- function(d, metrics = c("Observed","Pielou","Shannon")) {
+  tidyr::pivot_longer(d, dplyr::all_of(metrics),
                       names_to = "metric", values_to = "value")
 }
 
@@ -51,8 +53,8 @@ list_universes <- function(alpha_df) {
 }
 
 # overall fertilizer test (raw p) per metric on a subset
-.overall_fert_p <- function(d, min_n = MIN_N) {
-  purrr::map_dfr(c("Observed","Pielou","Shannon"), function(m){
+.overall_fert_p <- function(d, min_n = MIN_N, metrics = c("Observed","Pielou","Shannon")) {
+  purrr::map_dfr(metrics, function(m){
     g <- as.factor(d$fertilizer); v <- d[[m]]
     keep <- !is.na(v); v <- v[keep]; g <- droplevels(g[keep])
     tab <- table(g); p <- NA_real_
@@ -74,6 +76,11 @@ pvalue_transition_table <- function(d, metric, min_n = MIN_N) {
 
   test_pair <- function(sub, t1, t2) {
     s <- sub[sub$timepoint %in% c(t1,t2), ]
+    # s$timepoint keeps sub's FULL factor level set (e.g. T0/T1/T2) even
+    # after subsetting rows to just t1/t2 -- without dropping the now-empty
+    # levels, table() reports length>=2 regardless, and wilcox.test() then
+    # crashes on a >2-level factor. Same bug class as run_wilcox_time().
+    s$timepoint <- droplevels(as.factor(s$timepoint))
     tab <- table(s$timepoint)
     if (length(tab) < 2 || any(tab < min_n)) return("ns")
     p <- suppressWarnings(stats::wilcox.test(s[[metric]] ~ s$timepoint)$p.value)
@@ -109,38 +116,61 @@ pvalue_table_grob <- function(tbl, title = "Raw Wilcoxon p (consecutive timepoin
 }
 
 # ---- GOAL A: combined-timepoint snapshot, one figure per field -------------
-# 3 rows (metric) x dynamic cols (timepoint); n=1 -> dot only.
-plot_goalA_field <- function(d, pal, title, out_path, min_n = MIN_N) {
-  al <- .alpha_long_u(d)
+# 3 rows (metric) x dynamic cols (timepoint).
+#   chart_type = "box" (default, unchanged): n=1 -> dot only, n>=2 -> boxplot.
+#   chart_type = "bar": mean bar + SD error bar (error bar only when n>1).
+#   y_limits: optional c(lo, hi) to force a fixed y-axis (coord_cartesian,
+#             so it zooms the view without dropping/clipping any data).
+plot_goalA_field <- function(d, pal, title, out_path, min_n = MIN_N,
+                             metrics = c("Observed","Pielou","Shannon"),
+                             style = NULL, chart_type = "box", y_limits = NULL) {
+  al <- .alpha_long_u(d, metrics)
   if (nrow(al) == 0) return(NA_character_)
-  al <- .box_or_dot(al, c("metric","timepoint","fertilizer"))
-  box <- dplyr::filter(al, .n >= 2); dot <- dplyr::filter(al, .n == 1)
 
   # overall fert p per (metric, timepoint)
   pann <- al |> dplyr::distinct(metric, timepoint) |>
     purrr::pmap_dfr(function(metric, timepoint){
       sub <- dplyr::filter(d, timepoint == !!timepoint)
-      pp <- .overall_fert_p(sub, min_n) |> dplyr::filter(metric == !!metric)
+      pp <- .overall_fert_p(sub, min_n, metrics) |> dplyr::filter(metric == !!metric)
       tibble::tibble(metric=metric, timepoint=timepoint,
         lab = ifelse(is.na(pp$p), "ns", paste0("p=",signif(pp$p,2)," ",sig_stars(pp$p))))
     })
 
-  p <- ggplot2::ggplot(mapping = ggplot2::aes(fertilizer, value, fill = fertilizer)) +
-    { if (nrow(box)) ggplot2::geom_boxplot(data = box, outlier.shape = NA,
-        alpha=.7, linewidth=.3) } +
-    { if (nrow(box)) ggplot2::geom_jitter(data = box, width=.12, size=1.1,
-        alpha=.6, shape=21, colour="grey20") } +
-    { if (nrow(dot)) ggplot2::geom_point(data = dot, size=2.4, shape=21,
-        colour="grey20") } +
+  if (chart_type == "bar") {
+    summ <- al |>
+      dplyr::group_by(metric, timepoint, fertilizer) |>
+      dplyr::summarise(mean_val = mean(value, na.rm = TRUE),
+                       sd_val = stats::sd(value, na.rm = TRUE),
+                       n = dplyr::n(), .groups = "drop") |>
+      dplyr::mutate(sd_val = ifelse(n > 1, sd_val, NA_real_))
+    p <- ggplot2::ggplot(summ, ggplot2::aes(fertilizer, mean_val, fill = fertilizer)) +
+      ggplot2::geom_col(alpha = .75, width = .7, colour = "grey30", linewidth = .2) +
+      ggplot2::geom_errorbar(ggplot2::aes(ymin = mean_val - sd_val, ymax = mean_val + sd_val),
+                             width = .2, na.rm = TRUE)
+  } else {
+    al <- .box_or_dot(al, c("metric","timepoint","fertilizer"))
+    box <- dplyr::filter(al, .n >= 2); dot <- dplyr::filter(al, .n == 1)
+    p <- ggplot2::ggplot(mapping = ggplot2::aes(fertilizer, value, fill = fertilizer)) +
+      { if (nrow(box)) ggplot2::geom_boxplot(data = box, outlier.shape = NA,
+          alpha=.7, linewidth=.3) } +
+      { if (nrow(box)) ggplot2::geom_jitter(data = box, width=.12, size=1.1,
+          alpha=.6, shape=21, colour="grey20") } +
+      { if (nrow(dot)) ggplot2::geom_point(data = dot, size=2.4, shape=21,
+          colour="grey20") }
+  }
+
+  p <- p +
     ggplot2::scale_fill_manual(values = pal, guide = "none") +
     ggplot2::facet_grid(metric ~ timepoint, scales = "free_y") +
     ggplot2::geom_text(data = pann, ggplot2::aes(x=Inf, y=Inf, label=lab),
         inherit.aes=FALSE, hjust=1.05, vjust=1.4, size=2.8) +
     ggplot2::labs(title = title, x = NULL, y = NULL) +
-    ggplot2::theme_bw(base_size = 11) +
+    { if (is.null(style)) ggplot2::theme_bw(base_size = 11) else gold_plot_theme(style) } +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
         plot.title = ggplot2::element_text(face="bold"),
         axis.text.x = ggplot2::element_text(angle=45, hjust=1))
+  if (!is.null(y_limits)) p <- p + ggplot2::coord_cartesian(ylim = y_limits)
+
   n_tp <- dplyr::n_distinct(al$timepoint)
   ggplot2::ggsave(out_path, p, width = max(7, 3.2*n_tp), height = 8, dpi = 200,
                   limitsize = FALSE)
@@ -150,7 +180,8 @@ plot_goalA_field <- function(d, pal, title, out_path, min_n = MIN_N) {
 # ---- GOAL B/D-faceted: colored median trajectory + embedded p-table --------
 # one figure per metric. `facet_field` TRUE => facet_wrap(~field) (Goal D faceted)
 plot_trajectory_metric <- function(d, metric, pal, title, out_path,
-                                    facet_field = FALSE, min_n = MIN_N) {
+                                    facet_field = FALSE, min_n = MIN_N,
+                                    style = NULL, y_limits = NULL) {
   if (nrow(d) == 0) return(NA_character_)
   d$value <- d[[metric]]
   d$timepoint <- factor(d$timepoint, levels = sort(unique(d$timepoint)))
@@ -170,10 +201,11 @@ plot_trajectory_metric <- function(d, metric, pal, title, out_path,
     ggplot2::scale_shape_manual(values = rep(c(16,17,15,18,3,8,7,9,10,11,12,13,14),3),
         name="Fertilizer") +
     ggplot2::labs(title = title, x="Timepoint", y=metric) +
-    ggplot2::theme_bw(base_size = 11) +
+    { if (is.null(style)) ggplot2::theme_bw(base_size = 11) else gold_plot_theme(style) } +
     ggplot2::theme(panel.grid.minor = ggplot2::element_blank(),
         plot.title = ggplot2::element_text(face="bold"))
   if (facet_field) p <- p + ggplot2::facet_wrap(~ field, scales="free_y")
+  if (!is.null(y_limits)) p <- p + ggplot2::coord_cartesian(ylim = y_limits)
 
   # p-value table (pool fields if faceted-D uses overall; here per-plot scope)
   tbl <- pvalue_transition_table(d, metric, min_n)
@@ -188,38 +220,62 @@ plot_trajectory_metric <- function(d, metric, pal, title, out_path,
   out_path
 }
 
-# ---- GOAL C: pooled cross-field snapshot (boxplots, n=1 -> dot) ------------
-plot_goalC_pooled <- function(d, pal, title, out_path, min_n = MIN_N) {
-  al <- .alpha_long_u(d)
+# ---- GOAL C: pooled cross-field snapshot -----------------------------------
+#   chart_type = "box" (default, unchanged): n=1 -> dot only, n>=2 -> boxplot.
+#   chart_type = "bar": mean bar + SD error bar (error bar only when n>1).
+#   y_limits: optional c(lo, hi) to force a fixed y-axis.
+plot_goalC_pooled <- function(d, pal, title, out_path, min_n = MIN_N,
+                              metrics = c("Observed","Pielou","Shannon"),
+                              style = NULL, chart_type = "box", y_limits = NULL) {
+  al <- .alpha_long_u(d, metrics)
   if (nrow(al) == 0) return(NA_character_)
-  al <- .box_or_dot(al, c("metric","timepoint","fertilizer"))
-  box <- dplyr::filter(al, .n >= 2); dot <- dplyr::filter(al, .n == 1)
   pann <- al |> dplyr::distinct(metric, timepoint) |>
     purrr::pmap_dfr(function(metric, timepoint){
       sub <- dplyr::filter(d, timepoint == !!timepoint)
-      pp <- .overall_fert_p(sub, min_n) |> dplyr::filter(metric == !!metric)
+      pp <- .overall_fert_p(sub, min_n, metrics) |> dplyr::filter(metric == !!metric)
       tibble::tibble(metric=metric, timepoint=timepoint,
         lab = ifelse(is.na(pp$p),"ns",paste0("p=",signif(pp$p,2)," ",sig_stars(pp$p))))
     })
-  p <- ggplot2::ggplot(mapping = ggplot2::aes(fertilizer, value, fill=fertilizer)) +
-    { if (nrow(box)) ggplot2::geom_boxplot(data=box, outlier.shape=NA, alpha=.7, linewidth=.3) } +
-    { if (nrow(box)) ggplot2::geom_jitter(data=box, width=.12, size=1, alpha=.5, shape=21, colour="grey20") } +
-    { if (nrow(dot)) ggplot2::geom_point(data=dot, size=2.2, shape=21, colour="grey20") } +
+
+  if (chart_type == "bar") {
+    summ <- al |>
+      dplyr::group_by(metric, timepoint, fertilizer) |>
+      dplyr::summarise(mean_val = mean(value, na.rm = TRUE),
+                       sd_val = stats::sd(value, na.rm = TRUE),
+                       n = dplyr::n(), .groups = "drop") |>
+      dplyr::mutate(sd_val = ifelse(n > 1, sd_val, NA_real_))
+    p <- ggplot2::ggplot(summ, ggplot2::aes(fertilizer, mean_val, fill = fertilizer)) +
+      ggplot2::geom_col(alpha = .75, width = .7, colour = "grey30", linewidth = .2) +
+      ggplot2::geom_errorbar(ggplot2::aes(ymin = mean_val - sd_val, ymax = mean_val + sd_val),
+                             width = .2, na.rm = TRUE)
+  } else {
+    al <- .box_or_dot(al, c("metric","timepoint","fertilizer"))
+    box <- dplyr::filter(al, .n >= 2); dot <- dplyr::filter(al, .n == 1)
+    p <- ggplot2::ggplot(mapping = ggplot2::aes(fertilizer, value, fill=fertilizer)) +
+      { if (nrow(box)) ggplot2::geom_boxplot(data=box, outlier.shape=NA, alpha=.7, linewidth=.3) } +
+      { if (nrow(box)) ggplot2::geom_jitter(data=box, width=.12, size=1, alpha=.5, shape=21, colour="grey20") } +
+      { if (nrow(dot)) ggplot2::geom_point(data=dot, size=2.2, shape=21, colour="grey20") }
+  }
+
+  p <- p +
     ggplot2::scale_fill_manual(values = pal, guide="none") +
     ggplot2::facet_grid(metric ~ timepoint, scales="free_y") +
     ggplot2::geom_text(data=pann, ggplot2::aes(x=Inf, y=Inf, label=lab),
         inherit.aes=FALSE, hjust=1.05, vjust=1.4, size=2.8) +
     ggplot2::labs(title=title, x=NULL, y=NULL) +
-    ggplot2::theme_bw(base_size=11) +
+    { if (is.null(style)) ggplot2::theme_bw(base_size=11) else gold_plot_theme(style) } +
     ggplot2::theme(panel.grid.minor=ggplot2::element_blank(),
         plot.title=ggplot2::element_text(face="bold"),
         axis.text.x=ggplot2::element_text(angle=45, hjust=1))
+  if (!is.null(y_limits)) p <- p + ggplot2::coord_cartesian(ylim = y_limits)
+
   ggplot2::ggsave(out_path, p, width=9, height=8, dpi=200)
   out_path
 }
 
 # ---- GOAL D master POOLED plot: median +/- IQR per fertilizer over time ----
-plot_goalD_pooled <- function(d, metric, pal, title, out_path, min_n = MIN_N) {
+plot_goalD_pooled <- function(d, metric, pal, title, out_path, min_n = MIN_N,
+                              style = NULL, y_limits = NULL) {
   if (nrow(d) == 0) return(NA_character_)
   d$value <- d[[metric]]
   d$timepoint <- factor(d$timepoint, levels = sort(unique(d$timepoint)))
@@ -235,9 +291,10 @@ plot_goalD_pooled <- function(d, metric, pal, title, out_path, min_n = MIN_N) {
     ggplot2::scale_colour_manual(values=pal, name="Fertilizer") +
     ggplot2::labs(title=title, subtitle="Median ± IQR, pooled across all fields",
         x="Timepoint", y=metric) +
-    ggplot2::theme_bw(base_size=11) +
+    { if (is.null(style)) ggplot2::theme_bw(base_size=11) else gold_plot_theme(style) } +
     ggplot2::theme(panel.grid.minor=ggplot2::element_blank(),
         plot.title=ggplot2::element_text(face="bold"))
+  if (!is.null(y_limits)) p <- p + ggplot2::coord_cartesian(ylim = y_limits)
   tbl <- pvalue_transition_table(d, metric, min_n)
   grob <- pvalue_table_grob(tbl, paste0("Raw Wilcoxon p (pooled) — ", metric))
   combined <- p / grob + patchwork::plot_layout(heights = c(3, 1.4))

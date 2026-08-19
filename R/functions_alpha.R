@@ -118,8 +118,15 @@ run_wilcox_time <- function(values, timepoints, metric, min_n) {
   values <- values[keep]; tp <- droplevels(tp[keep])
   res <- list(metric = metric, test = NA, p_global = NA_real_,
               skipped = NA_character_)
-  if (!.gate_ok(tp, min_n) || nlevels(tp) < 2) {
-    res$skipped <- sprintf("need 2 timepoints with n>=%d", min_n); return(res)
+  # wilcox.test's formula interface requires EXACTLY 2 levels -- .gate_ok()
+  # only enforces >=2, so 3+ timepoints all present with sufficient n would
+  # otherwise pass the gate and crash wilcox.test() ("grouping factor must
+  # have exactly 2 levels"). This is a T0-vs-T1 test by design, not a
+  # general multi-timepoint one, so require exactly 2.
+  if (!.gate_ok(tp, min_n) || nlevels(tp) != 2) {
+    res$skipped <- sprintf("need exactly 2 timepoints with n>=%d (found %d)",
+                           min_n, nlevels(tp))
+    return(res)
   }
   w <- suppressWarnings(stats::wilcox.test(values ~ tp))
   res$test <- "wilcoxon_ranksum_T0vsT1"; res$p_global <- w$p.value

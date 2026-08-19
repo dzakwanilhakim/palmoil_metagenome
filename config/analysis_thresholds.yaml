@@ -1,0 +1,11 @@
+# =============================================================================
+# analysis_thresholds.yaml — cutoffs for the Analysis output stage
+#   (ANCOM-BC differential abundance + co-occurrence). Printed before each
+#   run, per project note ("set threshold in config then print before
+#   processing").
+# =============================================================================
+da:
+  adj_pval_cutoff: 0.05
+
+cooccurrence:
+  spearman_cutoff: 0.7

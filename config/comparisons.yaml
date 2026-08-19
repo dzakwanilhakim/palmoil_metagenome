@@ -62,7 +62,12 @@ goals:
     strata: field
 
 # ---- alpha metrics computed for every goal ----
-alpha_metrics: [Observed, Pielou, Shannon]
+# Scoped to Shannon only per the gold-tier Analysis output spec ("output only
+# Shannon diversity"). The Goal A/B/C/D plotting functions in
+# functions_report_tree.R also accept an explicit `metrics` override, so
+# reviving the old data/raw pipeline with Observed/Pielou is still possible
+# by passing metrics = c("Observed","Pielou","Shannon") there directly.
+alpha_metrics: [Shannon]
 
 # ---- stats settings ----
 stats_settings:

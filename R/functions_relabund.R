@@ -130,9 +130,11 @@ species_bar_df <- function(sp_long, genus_long, gp_map, marker, top_n = 15) {
     dplyr::summarise(mean_rel = mean(rel), .groups = "drop")
 
   grp_mean <- dplyr::filter(grp_mean, !stringr::str_detect(taxon, UNCLASS_RX))
+  # with_ties=FALSE: without it, mass ties at 0 abundance can blow the Top-N
+  # cap up to include every tied taxon (see functions_gold_relabund.R).
   top_sp <- grp_mean |> dplyr::group_by(taxon) |>
     dplyr::summarise(t = sum(mean_rel), .groups = "drop") |>
-    dplyr::slice_max(t, n = top_n) |> dplyr::pull(taxon)
+    dplyr::slice_max(t, n = top_n, with_ties = FALSE) |> dplyr::pull(taxon)
 
   grp_mean |>
     dplyr::mutate(taxon = ifelse(taxon %in% top_sp, taxon, "Other")) |>
@@ -200,10 +202,12 @@ mean_relabund <- function(long, gp_map, marker, rank, group_cols,
     grp_mean <- dplyr::filter(grp_mean,
                   !stringr::str_detect(taxon, UNCLASS_RX))
 
+  # with_ties=FALSE: without it, mass ties at 0 abundance can blow the Top-N
+  # cap up to include every tied taxon (see functions_gold_relabund.R).
   top_taxa <- grp_mean |>
     dplyr::group_by(taxon) |>
     dplyr::summarise(tot = sum(mean_rel), .groups = "drop") |>
-    dplyr::slice_max(tot, n = top_n) |> dplyr::pull(taxon)
+    dplyr::slice_max(tot, n = top_n, with_ties = FALSE) |> dplyr::pull(taxon)
 
   grp_mean |>
     dplyr::mutate(taxon = ifelse(taxon %in% top_taxa, taxon, "Other")) |>
@@ -212,26 +216,28 @@ mean_relabund <- function(long, gp_map, marker, rank, group_cols,
 }
 
 # stacked bar: x=fertilizer, facet=timepoint, fill=taxon
-plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL) {
+plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
+                             style = NULL) {
   if (nrow(plot_df) == 0) return(NA_character_)
   # fixed fertilizer x-axis if provided
   if (!is.null(all_ferts))
     plot_df$fertilizer <- factor(plot_df$fertilizer, levels = all_ferts)
   # GLOBAL order: rank taxa by total mean abundance across all groups in plot.
-  # ggplot stacks the FIRST factor level at the TOP, so to put "Other" on top
-  # we make it the first level, followed by taxa in ascending abundance
-  # (so the most abundant sits at the BOTTOM of the stack, a common convention).
+  # ggplot stacks the FIRST factor level at the TOP, so real (named) taxa go
+  # first in descending abundance (most abundant at the bottom of the
+  # stack), and Other/Unknown go LAST -> they render at the very bottom.
   ord_desc <- plot_df |> dplyr::group_by(taxon) |>
     dplyr::summarise(t = sum(mean_rel), .groups = "drop") |>
     dplyr::arrange(dplyr::desc(t)) |> dplyr::pull(taxon)
-  real <- setdiff(ord_desc, "Other")
-  # legend reads most-abundant first; stack: Other on top, then descending down
-  legend_levels <- c(if ("Other" %in% ord_desc) "Other", real)
+  real <- setdiff(ord_desc, c("Other", "Unknown"))
+  bottom <- intersect(c("Other", "Unknown"), ord_desc)
+  legend_levels <- c(real, bottom)
   plot_df$taxon <- factor(plot_df$taxon, levels = legend_levels)
 
   n_tax <- length(legend_levels)
   pal <- setNames(scales::hue_pal()(length(real)), real)
-  if ("Other" %in% legend_levels) pal <- c(Other = "grey75", pal)
+  bottom_pal <- c(Other = "grey75", Unknown = "grey45")
+  pal <- c(pal, bottom_pal[bottom])
 
   p <- ggplot2::ggplot(plot_df,
         ggplot2::aes(fertilizer, mean_rel, fill = taxon)) +
@@ -241,10 +247,18 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL) {
                                breaks = legend_levels) +
     ggplot2::scale_y_continuous(labels = scales::percent_format(),
                                 expand = ggplot2::expansion(c(0, .02))) +
+    # coord_cartesian, NOT scale_y_continuous(limits=...): for a STACKED bar,
+    # limits= on the scale censors (drops to NA) any point outside range
+    # evaluated against ggplot's internal cumulative stacking sum -- a tiny
+    # floating-point overshoot (e.g. 1.0000000002 from summing ~15 taxon
+    # fractions) gets silently censored, corrupting that bar's whole stack
+    # instead of just clipping the view. coord_cartesian only zooms the
+    # viewport and never touches the stat/position computation.
+    ggplot2::coord_cartesian(ylim = c(0, 1)) +
     ggplot2::facet_wrap(~ timepoint, nrow = 1) +
     ggplot2::labs(title = title, x = "Fertilizer",
                   y = "Mean relative abundance") +
-    ggplot2::theme_bw(base_size = 11) +
+    { if (is.null(style)) ggplot2::theme_bw(base_size = 11) else gold_plot_theme(style) } +
     ggplot2::theme(panel.grid = ggplot2::element_blank(),
                    plot.title = ggplot2::element_text(face = "bold"),
                    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),

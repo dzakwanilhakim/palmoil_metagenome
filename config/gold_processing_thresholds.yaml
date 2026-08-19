@@ -1,0 +1,27 @@
+# =============================================================================
+# gold_processing_thresholds.yaml — QC cutoffs for the gold -> processed step
+#   (taxonomic filter + depth/OTU-reads/prevalence filter on gold_matrix data,
+#   independently at genus and species rank; phylum is a rollup of genus).
+#
+#   sample_depth is per-marker only: total classified reads for a sample is
+#   the same read pool regardless of which rank you tabulate it at, so one
+#   cutoff applies to both genus and species matrices.
+#
+#   otu min_reads / prevalence_frac ARE rank-specific: species-level counts
+#   are far sparser than genus-level counts (many more categories sharing the
+#   same reads). Defaults below are carried over unchanged from the
+#   established config/thresholds.yaml (genus-only, pre-gold pipeline) as a
+#   starting point — REVIEW after inspecting the actual species-level
+#   depth/prevalence distribution; they were not re-derived for species.
+# =============================================================================
+sample_depth:
+  "16S": 50000
+  ITS:   10000
+
+otu:
+  "16S":
+    genus:   {min_reads: 10, prevalence_frac: 0.05}
+    species: {min_reads: 10, prevalence_frac: 0.05}
+  ITS:
+    genus:   {min_reads: 10, prevalence_frac: 0.05}
+    species: {min_reads: 10, prevalence_frac: 0.05}

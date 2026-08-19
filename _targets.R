@@ -1,16 +1,23 @@
 # =============================================================================
-# _targets.R  —  Palm Oil Soil Metagenomics pipeline
-# Stage 2 implemented (ingest + validation). Stage 3+ targets appended later.
+# _targets.R  —  Palm Oil Soil Metagenomics pipeline (gold-tier)
+#   data/source/*.xlsx + wf_*.html -> bronze -> silver -> gold -> QC/normalize
+#   -> Dashboard + Analysis output (alpha/beta/relabund/DA), synchronized with
+#   the originally-established Goal A/B/C/D + data_counts structure.
 # =============================================================================
 
 library(targets)
 library(tarchetypes)
 
 tar_option_set(
-  packages = c("tidyverse", "yaml", "arrow", "vegan", "patchwork", "permute",
+  # NOTE: ANCOMBC deliberately excluded here -- tar_option_set's packages
+  # are library()'d before ANY target runs, so listing an uninstalled
+  # package here would break the whole pipeline, not just the DA target.
+  # functions_gold_da.R calls it namespaced (ANCOMBC::ancombc2()), which
+  # only requires the package to exist when that specific target runs.
+  packages = c("tidyverse", "yaml", "vegan", "patchwork", "permute",
                "igraph", "ggraph", "pheatmap", "ggrepel", "readxl",
-               "rvest", "xml2"),
-  format   = "rds"     # default; long_qc overridden to parquet below
+               "rvest", "xml2", "phyloseq"),
+  format   = "rds"     # default for all targets
 )
 
 # load all function files
@@ -217,155 +224,174 @@ list(
                            "data/gold/gold_matrix_its_species.csv"),
              format = "file"),
 
-  # ---- config -------------------------------------------------------------
-  tar_target(schema_file, "config/schema.yaml", format = "file"),
-  tar_target(schema,      load_schema(schema_file)),
+  # ===== QC — gold -> processed matrix (taxonomic + threshold filter) =======
+  #   Independent at genus and species rank (both are DA/co-occurrence
+  #   targets downstream); pre-rarefaction (ANCOM-BC wants raw counts).
+  tar_target(gold_processing_thresholds_file,
+             "config/gold_processing_thresholds.yaml", format = "file"),
+  tar_target(gold_processing_thresholds,
+             load_gold_processing_thresholds(gold_processing_thresholds_file)),
 
-  # ---- raw file tracking (re-runs when ANY file changes/added) ------------
-  tar_target(meta_files,
-             list.files(c("data/raw/metadata_16s", "data/raw/metadata_its"),
-                        pattern = "\\.tsv$", full.names = TRUE),
+  tar_target(gold_processed_matrix_16s_genus,
+             build_gold_processed_matrix(gold_matrix_16s$genus, "16S", "genus",
+                                         gold_processing_thresholds)),
+  tar_target(gold_processed_matrix_16s_species,
+             build_gold_processed_matrix(gold_matrix_16s$species, "16S", "species",
+                                         gold_processing_thresholds)),
+  tar_target(gold_processed_matrix_its_genus,
+             build_gold_processed_matrix(gold_matrix_its$genus, "ITS", "genus",
+                                         gold_processing_thresholds)),
+  tar_target(gold_processed_matrix_its_species,
+             build_gold_processed_matrix(gold_matrix_its$species, "ITS", "species",
+                                         gold_processing_thresholds)),
+
+  tar_target(gold_processed_matrix_16s_genus_csv,
+             write_csv_out(gold_processed_matrix_16s_genus,
+                           "data/gold/gold_processed_matrix_16s_genus.csv"),
+             format = "file"),
+  tar_target(gold_processed_matrix_16s_species_csv,
+             write_csv_out(gold_processed_matrix_16s_species,
+                           "data/gold/gold_processed_matrix_16s_species.csv"),
+             format = "file"),
+  tar_target(gold_processed_matrix_its_genus_csv,
+             write_csv_out(gold_processed_matrix_its_genus,
+                           "data/gold/gold_processed_matrix_its_genus.csv"),
+             format = "file"),
+  tar_target(gold_processed_matrix_its_species_csv,
+             write_csv_out(gold_processed_matrix_its_species,
+                           "data/gold/gold_processed_matrix_its_species.csv"),
              format = "file"),
 
-  tar_target(mat_files_16s,
-            list.files("data/raw/raw_mat_16s",
-                        pattern = "_(genus|phylum)\\.tsv$", full.names = TRUE),
-            format = "file"),
+  # ===== NORMALIZE — rarefied species matrix, per universe (marker x stage) =
+  tar_target(gold_universe_lookup_16s, build_universe_lookup(gold_qc_16s)),
+  tar_target(gold_universe_lookup_its, build_universe_lookup(gold_qc_its)),
 
-  tar_target(mat_files_its,
-            list.files("data/raw/raw_mat_its",
-                        pattern = "_(genus|phylum)\\.tsv$", full.names = TRUE),
-            format = "file"),
-  # ---- compile ------------------------------------------------------------
-  tar_target(metadata_all, compile_metadata(meta_files, schema)),
+  tar_target(gold_rarefied_species_16s,
+             rarefy_species_by_universe(gold_processed_matrix_16s_species,
+                                        gold_universe_lookup_16s)),
+  tar_target(gold_rarefied_species_its,
+             rarefy_species_by_universe(gold_processed_matrix_its_species,
+                                        gold_universe_lookup_its)),
 
-  tar_target(long_counts,
-             compile_matrices(c(mat_files_16s, mat_files_its), schema)),
+  # ===== DASHBOARD ============================================================
+  tar_target(plot_style_file, "config/plot_style.yaml", format = "file"),
+  tar_target(plot_style, load_plot_style(plot_style_file)),
 
-  # ---- join (full string, prefix fallback) --------------------------------
-  tar_target(joined_counts,
-             join_with_fallback(long_counts, metadata_all, schema)),
-
-  # ---- STRICT validation gate (halts pipeline on any violation) ----------
-  tar_target(validation,
-             validate_data(metadata_all, joined_counts, long_counts, schema)),
-
-  # ---- QC drop (depends on validation passing) ----------------------------
-  tar_target(long_qc, {
-    validation                       # force dependency: QC only after validate
-    apply_qc(joined_counts, schema)
-  }, format = "parquet"),
-
-  # ---- drop report: which barcodes did NOT intersect (both directions) ----
-  tar_target(drop_report,
-             write_drop_report(long_counts, metadata_all, joined_counts, schema,
-                               out_path = "results/dropped_barcodes.csv"),
+  tar_target(dashboard_qc_status_pie,
+             build_qc_status_pie(gold_qc_16s, gold_qc_its, plot_style),
+             format = "file"),
+  tar_target(dashboard_prepost_depth,
+             build_prepost_depth_plot(gold_qc_16s, gold_qc_its,
+                                      gold_processed_matrix_16s_species,
+                                      gold_processed_matrix_its_species,
+                                      plot_style),
+             format = "file"),
+  tar_target(dashboard_rarefaction_curves,
+             build_rarefaction_curves(gold_matrix_16s$species,
+                                      gold_universe_lookup_16s,
+                                      gold_rarefied_species_16s,
+                                      gold_matrix_its$species,
+                                      gold_universe_lookup_its,
+                                      gold_rarefied_species_its),
+             format = "file"),
+  tar_target(dashboard_pcoa,
+             build_pcoa_plots(gold_rarefied_species_16s, gold_universe_lookup_16s,
+                              gold_rarefied_species_its, gold_universe_lookup_its,
+                              plot_style),
+             format = "file"),
+  tar_target(dashboard_shannon_barplot,
+             build_shannon_dashboard_barplot(alpha_shannon, plot_style),
+             format = "file"),
+  tar_target(dashboard_xlsx,
+             build_dashboard_xlsx(gold_universe_lookup_16s, gold_universe_lookup_its),
              format = "file"),
 
-  # ===== STAGE 3 — Step 1: taxonomic filtering (per marker) ================
-  tar_target(tax_filtered, taxonomic_filter(long_qc)),
+  # ===== ANALYSIS OUTPUT ======================================================
+  tar_target(analysis_thresholds_file, "config/analysis_thresholds.yaml",
+             format = "file"),
+  tar_target(analysis_thresholds, load_analysis_thresholds(analysis_thresholds_file)),
 
-  # ===== STAGE 3 — Step 2: pre-QC assessment (STOP for thresholds) =========
-  tar_target(preqc, preqc_assess(tax_filtered)),
+  # ---- alpha diversity (Shannon only, rarefied species matrix) -------------
+  tar_target(alpha_shannon,
+             build_alpha_shannon(gold_rarefied_species_16s, gold_universe_lookup_16s,
+                                 gold_rarefied_species_its, gold_universe_lookup_its)),
+  tar_target(alpha_shannon_plot,
+             plot_alpha_shannon(alpha_shannon, plot_style), format = "file"),
+  tar_target(alpha_shannon_csv,
+             write_alpha_shannon_csv(alpha_shannon), format = "file"),
 
-  # file targets so the plots are tracked and land in results/
-  tar_target(preqc_boxplot,    preqc$boxplot,     format = "file"),
-  tar_target(preqc_rarefaction, preqc$rarefaction, format = "file"),
+  # ---- beta diversity (Bray-Curtis only, rarefied species matrix) ----------
+  tar_target(beta_analysis,
+             build_beta_analysis(gold_rarefied_species_16s, gold_universe_lookup_16s,
+                                 gold_rarefied_species_its, gold_universe_lookup_its,
+                                 plot_style)),
+  tar_target(beta_analysis_plots, beta_analysis$plots, format = "file"),
+  tar_target(beta_analysis_permanova_csv, beta_analysis$permanova_csv, format = "file"),
 
-  # ===== STAGE 3 — Steps 3-5 (thresholds locked in config) =================
-  tar_target(thresholds_file, "config/thresholds.yaml", format = "file"),
-  tar_target(thresholds,      load_thresholds(thresholds_file)),
-
-  # Step 3: apply sample-depth + OTU + prevalence filters (per marker)
-  tar_target(thresholded, apply_thresholds(tax_filtered, thresholds)),
-
-  # Step 3/4: master synchronized sample list
-  tar_target(master_samples, master_sample_list(thresholded)),
-
-  # Unified filtered-barcode audit: every barcode removed at ANY stage + reason
-  tar_target(filtered_barcode_report,
-             write_filtered_barcode_report(long_counts, metadata_all, joined_counts,
-                                           tax_filtered, thresholded, schema, thresholds,
-                                           out_path = "results/filtered_barcodes_all.csv"),
+  # ---- data_counts (synchronized from established pipeline) ----------------
+  tar_target(gold_count_tables,
+             build_gold_count_tables(gold_universe_lookup_16s, gold_universe_lookup_its),
              format = "file"),
 
-  # Step 4: post-QC assessment
-  tar_target(postqc, postqc_summary(thresholded)),
-  tar_target(postqc_boxplot, plot_postqc_boxplot(postqc$depth),
-             format = "file"),
-  tar_target(postqc_rarefaction,
-             purrr::map_chr(unique(thresholded$marker),
-                            ~ plot_postqc_rarefaction(thresholded, thresholds, .x)),
+  # ---- Goal A/B/C/D alpha report tree (synchronized, Shannon-only) ---------
+  #   `comparisons` is declared in the established-pipeline Stage 4 block
+  #   below; targets resolves the dependency by reference, not list order.
+  tar_target(gold_report_tree,
+             build_gold_report_tree(alpha_shannon, comparisons, plot_style),
              format = "file"),
 
-  # Step 5: synchronized rarefied + CLR tables (identical samples & OTUs)
-  tar_target(norm_tables, build_rarefied_and_clr(thresholded, thresholds,
-                                                 seed = 42)),
+  # ---- Goal B/D beta breakdown (synchronized, Bray-Curtis only) -----------
+  tar_target(beta_goal_tree,
+             build_gold_beta_goal_tree(gold_rarefied_species_16s, gold_universe_lookup_16s,
+                                       gold_rarefied_species_its, gold_universe_lookup_its,
+                                       plot_style)),
+  tar_target(beta_goal_tree_plots, beta_goal_tree$plots, format = "file"),
+  tar_target(beta_goal_tree_permanova_csv, beta_goal_tree$permanova_csv, format = "file"),
 
-  # ===== STAGE 4 — alpha diversity + A/B/C/D stats =========================
+  # ---- Goal B/D relative abundance stacked bars (synchronized) -------------
+  #   species is the base rank; genus/phylum roll up from it.
+  tar_target(gold_relabund_tree,
+             build_gold_relabund_tree(gold_rarefied_species_16s, gold_universe_lookup_16s,
+                                      gold_processed_matrix_16s_species,
+                                      gold_rarefied_species_its, gold_universe_lookup_its,
+                                      gold_processed_matrix_its_species,
+                                      plot_style),
+             format = "file"),
+
+  # ---- DA (ANCOM-BC): Case 1 (fertilizer within field) + Case 2 (waktu ----
+  #      within field x fertilizer), genus + species, + Case 2 LFC dumbbells
+  tar_target(gold_da_analysis,
+             build_gold_da_analysis(gold_processed_matrix_16s_genus,
+                                    gold_processed_matrix_16s_species,
+                                    gold_universe_lookup_16s,
+                                    gold_processed_matrix_its_genus,
+                                    gold_processed_matrix_its_species,
+                                    gold_universe_lookup_its,
+                                    analysis_thresholds, plot_style)),
+  tar_target(gold_da_analysis_csv, gold_da_analysis$csv, format = "file"),
+  tar_target(gold_da_analysis_plots, gold_da_analysis$plots, format = "file"),
+
+  # ---- shared config: comparisons.yaml (Goal A/B/C/D definitions) ---------
+  #   Read by gold_report_tree above.
+  #
+  #   The REST of the originally-established data/raw-based pipeline (Stage 2
+  #   ingest/validation, Stage 3 taxonomic/threshold filter + rarefy+CLR,
+  #   Stage 4 alpha/beta/relabund/count report trees, Stage 5 co-occurrence
+  #   networks, raw exports) has been fully synchronized onto the gold-tier
+  #   pipeline above and its targets removed from this DAG: data/raw/ no
+  #   longer exists in this project (superseded by data/source -> bronze ->
+  #   silver -> gold), so list.files() against it always returned character(0),
+  #   which propagated to an empty metadata_all/long_counts and a hard
+  #   validate_data() stop() -- that aborted the ENTIRE tar_make() run, even
+  #   though every gold-tier target above it was otherwise fine on its own.
+  #   The original implementations are untouched and still callable directly
+  #   (functions_ingest.R, functions_qc.R, functions_qc_apply.R, and the
+  #   build_report_tree()/build_beta_tree()/build_relabund_tree()/
+  #   build_count_tables()/build_network_tree() drivers) -- they're just no
+  #   longer wired into the DAG. Their still-shared building blocks (GOAL_DIR,
+  #   fert_palette(), plot_ordination(), plot_stacked_bar(),
+  #   render_count_png(), universe_alpha_stats(), etc.) remain in active use
+  #   by the gold-tier targets above.
   tar_target(comparisons_file, "config/comparisons.yaml", format = "file"),
-  tar_target(comparisons, load_comparisons(comparisons_file)),
-
-  # per-sample alpha metrics (Observed, Pielou, Shannon) from rarefied
-  tar_target(alpha_div, compute_alpha(norm_tables, master_samples)),
-
-  # alpha stats per marker (A/B/C/D unpaired tests)
-  tar_target(alpha_stats_16s, run_alpha_stats(alpha_div, comparisons, "16S")),
-  tar_target(alpha_stats_its, run_alpha_stats(alpha_div, comparisons, "ITS")),
-  tar_target(alpha_stats_16s_csv, write_alpha_stats(alpha_stats_16s, "16S"),
-             format = "file"),
-  tar_target(alpha_stats_its_csv, write_alpha_stats(alpha_stats_its, "ITS"),
-             format = "file"),
-
-  # alpha plots routed into the depth-first per-universe tree (Results/)
-  tar_target(report_tree, build_report_tree(alpha_div, comparisons,
-                                            root = "Results"),
-             format = "file"),
-
-  # beta diversity (ordinations, dendrograms, PERMANOVA) into the same tree
-  tar_target(beta_tree, build_beta_tree(alpha_div, norm_tables,
-                                        root = "Results"),
-             format = "file"),
-
-  # relative abundance stacked bars (Goal B per field, Goal D pooled)
-  tar_target(relabund_tree, build_relabund_tree(thresholded, norm_tables,
-                                                master_samples, root = "Results",
-                                                top_ns = c(10, 15)),
-             format = "file"),
-
-  # replicate-count tables per field (post-QC) -> Results/data_counts/<universe>/
-  tar_target(count_tables, build_count_tables(master_samples, root = "Results"),
-             format = "file"),
-
-  # species matrices (separate files) -> species long restricted to master
-  tar_target(species_files,
-             list.files(c("data/raw/raw_mat_16s", "data/raw/raw_mat_its"),
-                        pattern = "_species\\.tsv$", full.names = TRUE),
-             format = "file"),
-  tar_target(species_long,
-             load_species_long(species_files, metadata_all, master_samples, schema)),
-
-  # species stacked bars (Top-15 species within Top-15 genera) Goal B + D
-  tar_target(species_tree,
-             build_species_tree(thresholded, norm_tables, master_samples,
-                                species_long, root = "Results", top_n = 15),
-             format = "file"),
-
-  # ===== STAGE 5 — Co-occurrence networks + Active Keystone identification =
-  tar_target(network_tree,
-             build_network_tree(norm_tables, master_samples, species_long,
-                                root = "Results"),
-             format = "file"),
-
-  # ===== RAW EXPORTS — dated aggregated CSVs (no QC/filtering) =============
-  tar_target(raw_exports,
-             export_raw_data(schema,
-                             mat_dirs  = c("data/raw/raw_mat_16s",
-                                           "data/raw/raw_mat_its"),
-                             meta_dirs = c("data/raw/metadata_16s",
-                                           "data/raw/metadata_its"),
-                             out_dir   = "Results/raw_exports"),
-             format = "file")
-
-  # ===== STAGE 5 COMPLETE ==================================================
+  tar_target(comparisons, load_comparisons(comparisons_file))
 )

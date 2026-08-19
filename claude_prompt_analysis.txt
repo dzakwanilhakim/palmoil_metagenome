@@ -1,0 +1,27 @@
+
+QC:
+- syncrhonize the gold data input with downstream QC, filter, and processing, and analysis
+- set thresholds in config then print before processing
+- create matrix gold_preocessed_matrix_{16s/its}_species.csv, or also for superkingdom, genus, phylum, if needed
+
+Dashboard:
+- Pie chart how many HIGH PASS, LOW PASS, and NO DATA (16s TM, ITS TM, 16s nursery, its nursery}
+- Pre QC and Pos QC sample depth (16s TM, ITS TM, 16s nursery, its nursery}
+- Rarefaction curve (16s TM, ITS TM, 16s nursery, its nursery}
+- PcoA rarefied species matr (16s TM, ITS TM, 16S Nursery, ITS Nursery) time is color, kode ebun is dot type
+- 
+
+Analysis output:
+- set threshold in config then print before processing
+- Alpha diversity using only rarefied species matrix with output only Shannon diversity
+- Beta diversity using only rarefied species matrix with output only Bray Curtis ordination pcoa, dendogram (color based on time), and PERMANVA
+- Relative abundance stacked bar chart using rarefied species matrix, genus, and phylum
+- DA Analysis only using species and genus taxa ANCOM BC (so DA and Cooccurence analysis based on genus, and also on species), adj pval < 0.05
+- Cooccurence analysis only using with species and genus taxa ANCOM BC, spearman >= 0.7
+- Do DA analysis and Cooccurence analysis:
+ - Case 1: same kode kebun across different kode pupuk across Waktu (Genus and Species)
+ - Case 2: same kode kebun, same kode pupuk, across waktu (Genus and Species)
+- Ignore keystone for now
+
+Notes:
+For all plot, increase the font size, bold, and set in config
