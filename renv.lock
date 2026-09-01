@@ -32,6 +32,73 @@
     "Version": "3.22"
   },
   "Packages": {
+    "ANCOMBC": {
+      "Package": "ANCOMBC",
+      "Version": "2.12.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Microbiome differential abudance and correlation analyses with bias correction",
+      "Description": "ANCOMBC is a package containing differential abundance (DA) and  correlation analyses for microbiome data. Specifically, the package includes  Analysis of Compositions of Microbiomes with Bias Correction 2 (ANCOM-BC2), Analysis of Compositions of Microbiomes with Bias Correction (ANCOM-BC), and  Analysis of Composition of Microbiomes (ANCOM) for DA analysis, and Sparse  Estimation of Correlations among Microbiomes (SECOM) for correlation  analysis. Microbiome data are typically subject to two sources of biases:  unequal sampling fractions (sample-specific biases) and differential  sequencing efficiencies (taxon-specific biases). Methodologies included in  the ANCOMBC package are designed to correct these biases and construct  statistically consistent estimators.",
+      "Date": "2025-03-16",
+      "Authors@R": "c( person(given = \"Huang\",  family = \"Lin\",  email = \"huanglinfrederick@gmail.com\",  role = c(\"cre\", \"aut\"), comment = c(ORCID = \"0000-0002-4892-7871\")))",
+      "License": "Artistic-2.0",
+      "Imports": [
+        "stats",
+        "CVXR",
+        "DescTools",
+        "Hmisc",
+        "MASS",
+        "Matrix",
+        "Rdpack",
+        "doParallel",
+        "doRNG",
+        "energy",
+        "foreach",
+        "gtools",
+        "lme4",
+        "lmerTest",
+        "multcomp",
+        "nloptr",
+        "parallel",
+        "utils"
+      ],
+      "Suggests": [
+        "mia (>= 1.6.0)",
+        "DT",
+        "S4Vectors",
+        "SingleCellExperiment",
+        "SummarizedExperiment",
+        "TreeSummarizedExperiment",
+        "dplyr",
+        "knitr",
+        "magrittr",
+        "microbiome",
+        "phyloseq",
+        "rmarkdown",
+        "testthat",
+        "tidyr",
+        "tidyverse"
+      ],
+      "biocViews": "DifferentialExpression, Microbiome, Normalization, Sequencing, Software",
+      "BugReports": "https://github.com/FrederickHuangLin/ANCOMBC/issues",
+      "URL": "https://github.com/FrederickHuangLin/ANCOMBC",
+      "VignetteBuilder": "knitr",
+      "RdMacros": "Rdpack",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.2",
+      "Depends": [
+        "R (>= 4.5.0)"
+      ],
+      "LazyData": "false",
+      "git_url": "https://git.bioconductor.org/packages/ANCOMBC",
+      "git_branch": "RELEASE_3_22",
+      "git_last_commit": "5ceba73",
+      "git_last_commit_date": "2025-10-29",
+      "Repository": "Bioconductor 3.22",
+      "NeedsCompilation": "no",
+      "Author": "Huang Lin [cre, aut] (ORCID: <https://orcid.org/0000-0002-4892-7871>)",
+      "Maintainer": "Huang Lin <huanglinfrederick@gmail.com>"
+    },
     "BH": {
       "Package": "BH",
       "Version": "1.90.0-1",
@@ -456,68 +523,63 @@
     },
     "CVXR": {
       "Package": "CVXR",
-      "Version": "1.9.1",
+      "Version": "1.0-15",
       "Source": "Repository",
       "Type": "Package",
       "Title": "Disciplined Convex Optimization",
-      "Date": "2026-06-05",
-      "Authors@R": "c( person(\"Anqi\", \"Fu\", role = c(\"aut\", \"cre\"), email = \"anqif@alumni.stanford.edu\"), person(\"Balasubramanian\", \"Narasimhan\", role = c(\"aut\"), email = \"naras@stat.stanford.edu\"), person(\"Steven\", \"Diamond\", role = c(\"aut\")), person(\"John\", \"Miller\", role = c(\"aut\")), person(\"Stephen\", \"Boyd\", role = c(\"ctb\"), email = \"boyd@stanford.edu\") )",
+      "VignetteBuilder": "knitr",
+      "Authors@R": "c( person(\"Anqi\", \"Fu\", role=c(\"aut\", \"cre\"), email = \"anqif@alumni.stanford.edu\"), person(\"Balasubramanian\", \"Narasimhan\", role=c(\"aut\"), email = \"naras@stat.stanford.edu\"), person(\"David W\", \"Kang\", role=c(\"aut\"), email = \"Dkang9503@gmail.com\"), person(\"Steven\", \"Diamond\", role=c(\"aut\"), email = \"stevend2@stanford.edu\"), person(\"John\", \"Miller\", role=c(\"aut\"), email = \"miller_john@berkeley.edu\"), person(\"Stephen\", \"Boyd\", role=c(\"ctb\"), email = \"boyd@stanford.edu\"), person(\"Paul Kunsberg\", \"Rosenfield\", role=c(\"ctb\"), email = \"prosenfield@farmersbusinessnetwork.com\") )",
       "URL": "https://cvxr.rbind.io, https://www.cvxgrp.org/CVXR/",
       "BugReports": "https://github.com/cvxgrp/CVXR/issues",
-      "Description": "An object-oriented modeling language for disciplined convex programming (DCP) as described in Fu, Narasimhan, and Boyd (2020, <doi:10.18637/jss.v094.i14>). It allows the user to formulate convex optimization problems in a natural way following mathematical convention and DCP rules. The system analyzes the problem, verifies its convexity, converts it into a canonical form, and hands it off to an appropriate solver to obtain the solution. This version uses the S7 object system for improved performance and maintainability.",
+      "Description": "An object-oriented modeling language for disciplined convex programming (DCP) as described in Fu, Narasimhan, and Boyd (2020, <doi:10.18637/jss.v094.i14>). It allows the user to formulate convex optimization problems in a natural way following mathematical convention and DCP rules. The system analyzes the problem, verifies its convexity, converts it into a canonical form, and hands it off to an appropriate solver to obtain the solution. Interfaces to solvers on CRAN and elsewhere are provided, both commercial and open source.",
+      "Additional_repositories": "https://bnaras.github.io/drat",
       "Depends": [
-        "R (>= 4.3.0)"
+        "R (>= 3.4.0)"
       ],
       "Imports": [
-        "S7 (>= 0.2)",
         "methods",
-        "Matrix (>= 1.7)",
-        "Rcpp (>= 1.1)",
-        "clarabel (>= 0.11)",
-        "cli (>= 3.6)",
-        "gmp (>= 0.7)",
-        "highs (>= 1.14)",
-        "osqp (>= 1.0)",
-        "scs (>= 3.2)",
-        "slam (>= 0.1)"
+        "Matrix",
+        "Rcpp (>= 0.12.12)",
+        "bit64",
+        "gmp",
+        "Rmpfr",
+        "ECOSolveR (>= 0.5.4)",
+        "scs (>= 3.0)",
+        "stats",
+        "osqp",
+        "cli",
+        "utils"
       ],
       "Suggests": [
-        "jsonlite (>= 1.9)",
         "knitr",
         "rmarkdown",
-        "testthat (>= 3.3)",
-        "rlang"
+        "testthat",
+        "nnls",
+        "slam",
+        "covr"
       ],
-      "Enhances": [
-        "Rmosek",
-        "gurobi (>= 13.0)",
-        "Rglpk (>= 0.6)",
-        "ECOSolveR (>= 0.6)",
-        "Rcplex (>= 0.3)",
-        "cccp (>= 0.3)",
-        "piqp (>= 0.6)",
-        "scip",
-        "xpress",
-        "diffcp (>= 0.1)",
-        "ipopt",
-        "sparsediff",
-        "Uno"
-      ],
-      "Additional_repositories": "https://bnaras.r-universe.dev, https://bnaras.github.io/drat",
       "LinkingTo": [
         "Rcpp",
         "RcppEigen"
       ],
       "License": "Apache License 2.0 | file LICENSE",
       "LazyData": "true",
+      "Collate": "'CVXR-package.R' 'data.R' 'globals.R' 'generics.R' 'interface.R' 'canonical.R' 'expressions.R' 'constant.R' 'variable.R' 'lin_ops.R' 'atoms.R' 'affine.R' 'problem.R' 'constraints.R' 'elementwise.R' 'coeff_extractor.R' 'reductions.R' 'reduction_solvers.R' 'complex2real.R' 'conic_solvers.R' 'clarabel.R' 'eliminate_pwl.R' 'dcp2cone.R' 'dgp2dcp.R' 'sparse_utils.R' 'qp2quad_form.R' 'qp_solvers.R' 'utilities.R' 'coll_utils.R' 'solver_utilities.R' 'transforms.R' 'exports.R' 'rcppUtils.R' 'LinOp.R' 'LinOpVector.R' 'RcppExports.R' 'CVXcanon.R' 'canonInterface.R'",
+      "RoxygenNote": "7.3.2",
       "Encoding": "UTF-8",
-      "VignetteBuilder": "knitr",
-      "Config/testthat/edition": "3",
-      "Config/roxygen2/version": "8.0.0",
+      "Enhances": [
+        "Rcplex",
+        "gurobi",
+        "rcbc",
+        "cccp",
+        "Rmosek",
+        "Rglpk",
+        "clarabel (>= 0.9.0)"
+      ],
       "NeedsCompilation": "yes",
-      "Author": "Anqi Fu [aut, cre], Balasubramanian Narasimhan [aut], Steven Diamond [aut], John Miller [aut], Stephen Boyd [ctb]",
+      "Author": "Anqi Fu [aut, cre], Balasubramanian Narasimhan [aut], David W Kang [aut], Steven Diamond [aut], John Miller [aut], Stephen Boyd [ctb], Paul Kunsberg Rosenfield [ctb]",
       "Maintainer": "Anqi Fu <anqif@alumni.stanford.edu>",
-      "Repository": "RSPM"
+      "Repository": "CRAN"
     },
     "Cairo": {
       "Package": "Cairo",
@@ -641,6 +703,35 @@
       "git_last_commit_date": "2025-10-29",
       "Repository": "Bioconductor 3.22",
       "NeedsCompilation": "yes"
+    },
+    "DEoptimR": {
+      "Package": "DEoptimR",
+      "Version": "1.2-0",
+      "Source": "Repository",
+      "Date": "2026-06-07",
+      "Title": "Differential Evolution Optimization in Pure R",
+      "Authors@R": "c( person(c(\"Eduardo\", \"L. T.\"), \"Conceicao\", role = c(\"aut\", \"cre\"), email = \"mail@eduardoconceicao.org\"), person(\"Martin\", \"Maechler\", role = \"ctb\", email = \"maechler@stat.math.ethz.ch\", comment = c(ORCID = \"0000-0002-8685-9910\")) )",
+      "URL": "svn://svn.r-forge.r-project.org/svnroot/robustbase/pkg/DEoptimR",
+      "Description": "Differential Evolution (DE) stochastic heuristic algorithms for global optimization of problems with and without general constraints. The aim is to curate a collection of its variants that (1) do not sacrifice simplicity of design, (2) are essentially tuning-free, and (3) can be efficiently implemented directly in the R language. Currently, it provides implementations of the algorithms 'jDE' by Brest et al. (2006) <doi:10.1109/TEVC.2006.872133> for single-objective optimization and 'NCDE' by Qu et al. (2012) <doi:10.1109/TEVC.2011.2161873> for multimodal optimization (single-objective problems with multiple solutions).",
+      "Imports": [
+        "stats",
+        "methods"
+      ],
+      "Suggests": [
+        "mirai (>= 2.7.1)"
+      ],
+      "Enhances": [
+        "robustbase"
+      ],
+      "License": "GPL (>= 2)",
+      "Author": "Eduardo L. T. Conceicao [aut, cre], Martin Maechler [ctb] (ORCID: <https://orcid.org/0000-0002-8685-9910>)",
+      "Maintainer": "Eduardo L. T. Conceicao <mail@eduardoconceicao.org>",
+      "Repository": "RSPM",
+      "Repository/R-Forge/Project": "robustbase",
+      "Repository/R-Forge/Revision": "1025",
+      "Repository/R-Forge/DateTimeStamp": "2026-06-07 16:58:58",
+      "NeedsCompilation": "no",
+      "Encoding": "UTF-8"
     },
     "DelayedArray": {
       "Package": "DelayedArray",
@@ -845,6 +936,39 @@
       "NeedsCompilation": "yes",
       "Author": "Martin Morgan [aut, cre] (ORCID: <https://orcid.org/0000-0002-5874-8148>)",
       "Maintainer": "Martin Morgan <mtmorgan.xyz@gmail.com>"
+    },
+    "ECOSolveR": {
+      "Package": "ECOSolveR",
+      "Version": "0.6.1",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Embedded Conic Solver in R",
+      "Date": "2026-02-18",
+      "VignetteBuilder": "knitr",
+      "Authors@R": "c(person(\"Anqi\", \"Fu\", role = c(\"aut\"), email = \"anqi.fu.1987@gmail.com\"), person(\"Balasubramanian\", \"Narasimhan\", role = c(\"aut\", \"cre\"), email = \"naras@stat.Stanford.EDU\"), person(\"Florian\", \"Schwendinger\", role = c(\"ctb\"), email = \"FlorianSchwendinger@gmx.at\"), person(\"Martin\", \"Maechler\", role = \"ctb\", email = \"maechler@stat.math.ethz.ch\") )",
+      "SystemRequirements": "GNU make",
+      "URL": "https://bnaras.github.io/ECOSolveR/",
+      "BugReports": "https://github.com/bnaras/ECOSolveR/issues",
+      "Imports": [
+        "cli",
+        "methods"
+      ],
+      "Suggests": [
+        "knitr",
+        "rmarkdown",
+        "testthat",
+        "Matrix",
+        "covr",
+        "slam"
+      ],
+      "Description": "R interface to the Embedded COnic Solver (ECOS), an efficient and robust C library for convex problems. Conic and equality constraints can be specified in addition to integer and boolean variable constraints for mixed-integer problems. This R interface is inspired by the python interface and has similar calling conventions.",
+      "License": "GPL (>= 3)",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.3",
+      "NeedsCompilation": "yes",
+      "Author": "Anqi Fu [aut], Balasubramanian Narasimhan [aut, cre], Florian Schwendinger [ctb], Martin Maechler [ctb]",
+      "Maintainer": "Balasubramanian Narasimhan <naras@stat.Stanford.EDU>",
+      "Repository": "CRAN"
     },
     "Exact": {
       "Package": "Exact",
@@ -1796,6 +1920,50 @@
       "Maintainer": "Georgi N. Boshnakov <georgi.boshnakov@manchester.ac.uk>",
       "Repository": "RSPM"
     },
+    "Rmpfr": {
+      "Package": "Rmpfr",
+      "Version": "1.1-2",
+      "Source": "Repository",
+      "Title": "Interface R to MPFR - Multiple Precision Floating-Point Reliable",
+      "VersionNote": "Last CRAN: 1.1-1 on 2025-07-18; 1.1-0 on 2025-05-08; 1.0-0 on 2024-11-15",
+      "Date": "2025-10-21",
+      "Type": "Package",
+      "Authors@R": "c(person(\"Martin\",\"Maechler\", role = c(\"aut\",\"cre\"), email = \"maechler@stat.math.ethz.ch\", comment = c(ORCID=\"0000-0002-8685-9910\")) , person(c(\"Richard\", \"M.\"), \"Heiberger\", role = \"ctb\", email=\"rmh@temple.edu\", comment = \"formatHex(), *Bin, *Dec\") , person(c(\"John\", \"C.\"), \"Nash\", role = \"ctb\", email=\"nashjc@uottawa.ca\", comment = \"hjkMpfr(), origin of unirootR()\") , person(c(\"Hans\", \"W.\"), \"Borchers\", role = \"ctb\", email=\"hwborchers@googlemail.com\", comment = \"optimizeR(*, \\\"GoldenRatio\\\"); origin of hjkMpfr()\") , person(\"Mikael\", \"Jagan\", role = \"ctb\", comment = c(\"safer convert.c; configure.ac etc\", ORCID = \"0000-0002-3542-2938\")) )",
+      "Description": "Arithmetic (via S4 classes and methods) for arbitrary precision floating point numbers, including transcendental (\"special\") functions.  To this end, the package interfaces to the 'LGPL' licensed 'MPFR' (Multiple Precision Floating-Point Reliable) Library which itself is based on the 'GMP' (GNU Multiple Precision) Library.",
+      "SystemRequirements": "gmp (>= 4.2.3), mpfr (>= 3.2.0), pdfcrop (part of TexLive) is required to rebuild the vignettes.",
+      "SystemRequirementsNote": "'MPFR' (MP Floating-Point Reliable Library, https://www.mpfr.org/) and 'GMP' (GNU Multiple Precision library, https://gmplib.org/), see >> README.md",
+      "Depends": [
+        "gmp (>= 0.6-1)",
+        "R (>= 3.6.0)"
+      ],
+      "Imports": [
+        "stats",
+        "utils",
+        "methods"
+      ],
+      "Suggests": [
+        "DPQmpfr",
+        "MASS",
+        "Bessel",
+        "polynom",
+        "sfsmisc (>= 1.1-14)"
+      ],
+      "SuggestsNote": "MASS, polynom, sfsmisc: only for vignette;",
+      "Enhances": [
+        "dfoptim",
+        "pracma",
+        "DPQ"
+      ],
+      "EnhancesNote": "mentioned in Rd xrefs | used in example",
+      "URL": "https://rmpfr.r-forge.r-project.org/",
+      "BugReports": "https://r-forge.r-project.org/tracker/?group_id=386",
+      "License": "GPL (>= 2)",
+      "Encoding": "UTF-8",
+      "NeedsCompilation": "yes",
+      "Author": "Martin Maechler [aut, cre] (ORCID: <https://orcid.org/0000-0002-8685-9910>), Richard M. Heiberger [ctb] (formatHex(), *Bin, *Dec), John C. Nash [ctb] (hjkMpfr(), origin of unirootR()), Hans W. Borchers [ctb] (optimizeR(*, \"GoldenRatio\"); origin of hjkMpfr()), Mikael Jagan [ctb] (safer convert.c; configure.ac etc, ORCID: <https://orcid.org/0000-0002-3542-2938>)",
+      "Maintainer": "Martin Maechler <maechler@stat.math.ethz.ch>",
+      "Repository": "CRAN"
+    },
     "Rtsne": {
       "Package": "Rtsne",
       "Version": "0.17",
@@ -2450,13 +2618,13 @@
     },
     "arrow": {
       "Package": "arrow",
-      "Version": "24.0.0",
+      "Version": "25.0.0",
       "Source": "Repository",
       "Title": "Integration to 'Apache' 'Arrow'",
       "Authors@R": "c( person(\"Neal\", \"Richardson\", email = \"neal.p.richardson@gmail.com\", role = c(\"aut\")), person(\"Ian\", \"Cook\", email = \"ianmcook@gmail.com\", role = c(\"aut\")), person(\"Nic\", \"Crane\", email = \"thisisnic@gmail.com\", role = c(\"aut\")), person(\"Dewey\", \"Dunnington\", role = c(\"aut\"), email = \"dewey@fishandwhistle.net\", comment = c(ORCID = \"0000-0002-9415-4582\")), person(\"Romain\", \"Fran\\u00e7ois\", role = c(\"aut\"), comment = c(ORCID = \"0000-0002-2444-4226\")), person(\"Jonathan\", \"Keane\", email = \"jkeane@gmail.com\", role = c(\"aut\", \"cre\")), person(\"Bryce\", \"Mecum\", email = \"brycemecum@gmail.com\", role = c(\"aut\")), person(\"Drago\\u0219\", \"Moldovan-Gr\\u00fcnfeld\", email = \"dragos.mold@gmail.com\", role = c(\"aut\")), person(\"Jeroen\", \"Ooms\", email = \"jeroen@berkeley.edu\", role = c(\"aut\")), person(\"Jacob\", \"Wujciak-Jens\", email = \"jacob@wujciak.de\", role = c(\"aut\")), person(\"Javier\", \"Luraschi\", email = \"javier@rstudio.com\", role = c(\"ctb\")), person(\"Karl\", \"Dunkle Werner\", email = \"karldw@users.noreply.github.com\", role = c(\"ctb\"), comment = c(ORCID = \"0000-0003-0523-7309\")), person(\"Jeffrey\", \"Wong\", email = \"jeffreyw@netflix.com\", role = c(\"ctb\")), person(\"Apache Arrow\", email = \"dev@arrow.apache.org\", role = c(\"aut\", \"cph\")) )",
       "Description": "'Apache' 'Arrow' <https://arrow.apache.org/> is a cross-language development platform for in-memory data. It specifies a standardized language-independent columnar memory format for flat and hierarchical data, organized for efficient analytic operations on modern hardware. This package provides an interface to the 'Arrow C++' library.",
       "Depends": [
-        "R (>= 4.1)"
+        "R (>= 4.2)"
       ],
       "License": "Apache License (>= 2.0)",
       "URL": "https://github.com/apache/arrow/, https://arrow.apache.org/docs/r/",
@@ -2478,7 +2646,6 @@
         "utils",
         "vctrs"
       ],
-      "RoxygenNote": "7.3.3",
       "Config/testthat/edition": "3",
       "Config/build/bootstrap": "TRUE",
       "Suggests": [
@@ -2510,7 +2677,8 @@
       "LinkingTo": [
         "cpp11 (>= 0.4.2)"
       ],
-      "Collate": "'arrowExports.R' 'enums.R' 'arrow-object.R' 'type.R' 'array-data.R' 'arrow-datum.R' 'array.R' 'arrow-info.R' 'arrow-package.R' 'arrow-tabular.R' 'buffer.R' 'chunked-array.R' 'io.R' 'compression.R' 'scalar.R' 'compute.R' 'config.R' 'csv.R' 'dataset.R' 'dataset-factory.R' 'dataset-format.R' 'dataset-partition.R' 'dataset-scan.R' 'dataset-write.R' 'dictionary.R' 'dplyr-across.R' 'dplyr-arrange.R' 'dplyr-by.R' 'dplyr-collect.R' 'dplyr-count.R' 'dplyr-datetime-helpers.R' 'dplyr-distinct.R' 'dplyr-eval.R' 'dplyr-filter.R' 'dplyr-funcs-agg.R' 'dplyr-funcs-augmented.R' 'dplyr-funcs-conditional.R' 'dplyr-funcs-datetime.R' 'dplyr-funcs-doc.R' 'dplyr-funcs-math.R' 'dplyr-funcs-simple.R' 'dplyr-funcs-string.R' 'dplyr-funcs-type.R' 'expression.R' 'dplyr-funcs.R' 'dplyr-glimpse.R' 'dplyr-group-by.R' 'dplyr-join.R' 'dplyr-mutate.R' 'dplyr-select.R' 'dplyr-slice.R' 'dplyr-summarize.R' 'dplyr-union.R' 'record-batch.R' 'table.R' 'dplyr.R' 'duckdb.R' 'extension.R' 'feather.R' 'field.R' 'filesystem.R' 'flight.R' 'install-arrow.R' 'ipc-stream.R' 'json.R' 'memory-pool.R' 'message.R' 'metadata.R' 'parquet.R' 'python.R' 'query-engine.R' 'record-batch-reader.R' 'record-batch-writer.R' 'reexports-bit64.R' 'reexports-tidyselect.R' 'schema.R' 'udf.R' 'util.R'",
+      "Collate": "'arrowExports.R' 'enums.R' 'arrow-object.R' 'type.R' 'array-data.R' 'arrow-datum.R' 'array.R' 'arrow-info.R' 'arrow-package.R' 'arrow-tabular.R' 'buffer.R' 'chunked-array.R' 'io.R' 'compression.R' 'scalar.R' 'compute.R' 'config.R' 'csv.R' 'dataset.R' 'dataset-factory.R' 'dataset-format.R' 'dataset-partition.R' 'dataset-scan.R' 'dataset-write.R' 'dictionary.R' 'dplyr-across.R' 'dplyr-arrange.R' 'dplyr-by.R' 'dplyr-collect.R' 'dplyr-count.R' 'dplyr-datetime-helpers.R' 'dplyr-distinct.R' 'dplyr-eval.R' 'dplyr-filter.R' 'dplyr-funcs-agg.R' 'dplyr-funcs-augmented.R' 'dplyr-funcs-conditional.R' 'dplyr-funcs-datetime.R' 'dplyr-funcs-doc.R' 'dplyr-funcs-math.R' 'dplyr-funcs-simple.R' 'dplyr-funcs-string.R' 'dplyr-funcs-type.R' 'expression.R' 'dplyr-funcs.R' 'dplyr-glimpse.R' 'dplyr-group-by.R' 'dplyr-join.R' 'dplyr-mutate.R' 'dplyr-select.R' 'dplyr-slice.R' 'dplyr-summarize.R' 'dplyr-union.R' 'record-batch.R' 'table.R' 'dplyr.R' 'duckdb.R' 'extension.R' 'feather.R' 'field.R' 'filesystem.R' 'flight.R' 'install-arrow.R' 'ipc-stream.R' 'json.R' 'memory-pool.R' 'message.R' 'metadata.R' 'parquet.R' 'python.R' 'query-engine.R' 'record-batch-reader.R' 'record-batch-writer.R' 'reexports-tidyselect.R' 'schema.R' 'udf.R' 'util.R'",
+      "Config/roxygen2/version": "8.0.0",
       "NeedsCompilation": "yes",
       "Author": "Neal Richardson [aut], Ian Cook [aut], Nic Crane [aut], Dewey Dunnington [aut] (ORCID: <https://orcid.org/0000-0002-9415-4582>), Romain François [aut] (ORCID: <https://orcid.org/0000-0002-2444-4226>), Jonathan Keane [aut, cre], Bryce Mecum [aut], Dragoș Moldovan-Grünfeld [aut], Jeroen Ooms [aut], Jacob Wujciak-Jens [aut], Javier Luraschi [ctb], Karl Dunkle Werner [ctb] (ORCID: <https://orcid.org/0000-0003-0523-7309>), Jeffrey Wong [ctb], Apache Arrow [aut, cph]",
       "Maintainer": "Jonathan Keane <jkeane@gmail.com>",
@@ -2665,6 +2833,42 @@
       "Author": "Michel Lang [cre, aut] (<https://orcid.org/0000-0001-9754-0393>), Apache Foundation [ctb, cph], Free Software Foundation [ctb, cph]",
       "Maintainer": "Michel Lang <michellang@gmail.com>",
       "Repository": "CRAN"
+    },
+    "bayesm": {
+      "Package": "bayesm",
+      "Version": "3.1-7",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Bayesian Inference for Marketing/Micro-Econometrics",
+      "Depends": [
+        "R (>= 3.2.0)"
+      ],
+      "Date": "2025-11-09",
+      "Authors@R": "c(person(given = \"Peter\", family = \"Rossi\", role = c(\"aut\", \"cre\"),  email = \"perossichi@gmail.com\"), person(given = \"Robert\", family = \"McCulloch\", role = \"ctb\"), person(given = \"Wayne\", family = \"Taylor\", role = \"ctb\"), person(given = \"Dan\", family = \"Yavorsky\", role = \"ctb\") )",
+      "Maintainer": "Peter Rossi <perossichi@gmail.com>",
+      "License": "GPL (>= 2)",
+      "Imports": [
+        "Rcpp (>= 0.12.0)",
+        "utils",
+        "stats",
+        "graphics",
+        "grDevices"
+      ],
+      "LinkingTo": [
+        "Rcpp",
+        "RcppArmadillo"
+      ],
+      "Suggests": [
+        "knitr",
+        "rmarkdown"
+      ],
+      "VignetteBuilder": "knitr",
+      "Description": "Covers many important models used in marketing and micro-econometrics applications.  The package includes: Bayes Regression (univariate or multivariate dep var), Bayes Seemingly Unrelated Regression (SUR), Binary and Ordinal Probit, Multinomial Logit (MNL) and Multinomial Probit (MNP), Multivariate Probit, Negative Binomial (Poisson) Regression, Multivariate Mixtures of Normals (including clustering), Dirichlet Process Prior Density Estimation with normal base, Hierarchical Linear Models with normal prior and covariates, Hierarchical Linear Models with a mixture of normals prior and covariates, Hierarchical Multinomial Logits with a mixture of normals prior and covariates, Hierarchical Multinomial Logits with a Dirichlet Process prior and covariates, Hierarchical Negative Binomial Regression Models, Bayesian analysis of choice-based conjoint data, Bayesian treatment of linear instrumental variables models, Analysis of Multivariate Ordinal survey data with scale usage heterogeneity (as in Rossi et al, JASA (01)), Bayesian Analysis of Aggregate Random Coefficient Logit Models as in BLP (see Jiang, Manchanda, Rossi 2009) For further reference, consult our book, Bayesian Statistics and Marketing by Rossi, Allenby and McCulloch (Wiley second edition 2024) and Bayesian Non- and Semi-Parametric Methods and Applications (Princeton U Press 2014).",
+      "RoxygenNote": "6.0.1",
+      "NeedsCompilation": "yes",
+      "Author": "Peter Rossi [aut, cre], Robert McCulloch [ctb], Wayne Taylor [ctb], Dan Yavorsky [ctb]",
+      "Repository": "RSPM",
+      "Encoding": "UTF-8"
     },
     "beachmat": {
       "Package": "beachmat",
@@ -3605,6 +3809,45 @@
       "Author": "Jeroen Ooms [aut, cre] (ORCID: <https://orcid.org/0000-0002-4035-0289>), John MacFarlane [cph] (Author of cmark)",
       "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
       "Repository": "RSPM"
+    },
+    "compositions": {
+      "Package": "compositions",
+      "Version": "2.0-9",
+      "Source": "Repository",
+      "Date": "2025-08-20",
+      "Title": "Compositional Data Analysis",
+      "Authors@R": "c(person(given = c(\"K.\", \"Gerald\"), family = \"van den Boogaart\", role = c(\"aut\", \"cre\"), email = \"support@boogaart.de\"), person(given = \"Raimon\", family = \"Tolosana-Delgado\", role = \"aut\"), person(given = \"Matevz\", family = \"Bren\", role = \"aut\"))",
+      "Depends": [
+        "R (>= 3.6)"
+      ],
+      "Imports": [
+        "methods",
+        "utils",
+        "grDevices",
+        "stats",
+        "tensorA",
+        "robustbase",
+        "bayesm",
+        "graphics",
+        "MASS"
+      ],
+      "Suggests": [
+        "rgl (>= 1.0.1)",
+        "combinat",
+        "energy",
+        "knitr",
+        "rmarkdown"
+      ],
+      "Description": "Provides functions for the consistent analysis of compositional  data (e.g. portions of substances) and positive numbers (e.g. concentrations)  in the way proposed by J. Aitchison and V. Pawlowsky-Glahn.",
+      "License": "GPL (>= 2)",
+      "URL": "http://www.stat.boogaart.de/compositions/",
+      "VignetteBuilder": "knitr",
+      "RoxygenNote": "7.1.1",
+      "NeedsCompilation": "yes",
+      "Author": "K. Gerald van den Boogaart [aut, cre], Raimon Tolosana-Delgado [aut], Matevz Bren [aut]",
+      "Maintainer": "K. Gerald van den Boogaart <support@boogaart.de>",
+      "Repository": "RSPM",
+      "Encoding": "UTF-8"
     },
     "conflicted": {
       "Package": "conflicted",
@@ -7014,6 +7257,58 @@
       "Author": "Tuomas Borman [aut, cre] (ORCID: <https://orcid.org/0000-0002-8563-8884>), Felix G.M. Ernst [aut] (ORCID: <https://orcid.org/0000-0001-5064-0928>), Sudarshan A. Shetty [aut] (ORCID: <https://orcid.org/0000-0001-7280-9915>), Leo Lahti [aut] (ORCID: <https://orcid.org/0000-0001-5537-637X>), Yang Cao [ctb], Nathan D. Olson [ctb], Levi Waldron [ctb], Marcel Ramos [ctb], Héctor Corrada Bravo [ctb], Jayaram Kancherla [ctb], Domenick Braccia [ctb], Basil Courbayre [ctb], Geraldson Muluh [ctb], Giulio Benedetti [ctb], Moritz Emanuel Beber [ctb] (ORCID: <https://orcid.org/0000-0003-2406-1978>), Chouaib Benchraka [ctb], Akewak Jeba [ctb] (ORCID: <https://orcid.org/0009-0007-1347-7552>), Himmi Lindgren [ctb], Noah De Gunst [ctb], Théotime Pralas [ctb], Shadman Ishraq [ctb], Eineje Ameh [ctb], Artur Sannikov [ctb], Hervé Pagès [ctb], Rajesh Shigdel [ctb], Katariina Pärnänen [ctb], Pande Erawijantari [ctb], Danielle Callan [ctb], Sam Hillman [ctb], Jesse Pasanen [ctb], Eetu Tammi [ctb]",
       "Maintainer": "Tuomas Borman <tuomas.v.borman@utu.fi>"
     },
+    "microbiome": {
+      "Package": "microbiome",
+      "Version": "1.32.0",
+      "Source": "Bioconductor",
+      "Type": "Package",
+      "Title": "Microbiome Analytics",
+      "Description": "Utilities for microbiome analysis.",
+      "Encoding": "UTF-8",
+      "Date": "2025-07-24",
+      "Authors@R": "c( person(\"Leo\", \"Lahti\", email = \"leo.lahti@iki.fi\", role = c(\"aut\", \"cre\"), comment = c(ORCID = \"0000-0001-5537-637X\")), person(\"Sudarshan\", \"Shetty\", role = \"aut\", comment = c(ORCID = \"0000-0001-7280-9915\")))",
+      "biocViews": "Metagenomics,Microbiome,Sequencing,SystemsBiology",
+      "License": "BSD_2_clause + file LICENSE",
+      "Depends": [
+        "R (>= 3.6.0)",
+        "phyloseq",
+        "ggplot2"
+      ],
+      "Imports": [
+        "Biostrings",
+        "compositions",
+        "dplyr",
+        "reshape2",
+        "Rtsne",
+        "scales",
+        "stats",
+        "tibble",
+        "tidyr",
+        "utils",
+        "vegan"
+      ],
+      "Suggests": [
+        "BiocGenerics",
+        "BiocStyle",
+        "Cairo",
+        "knitr",
+        "rmarkdown",
+        "testthat"
+      ],
+      "URL": "http://microbiome.github.io/microbiome",
+      "MailingList": "microbiome <microbiome-devel@googlegroups.com>",
+      "BugReports": "https://github.com/microbiome/microbiome/issues",
+      "VignetteBuilder": "knitr",
+      "RoxygenNote": "7.3.2",
+      "git_url": "https://git.bioconductor.org/packages/microbiome",
+      "git_branch": "RELEASE_3_22",
+      "git_last_commit": "57d7b1a",
+      "git_last_commit_date": "2025-10-29",
+      "Repository": "Bioconductor 3.22",
+      "NeedsCompilation": "no",
+      "Author": "Leo Lahti [aut, cre] (ORCID: <https://orcid.org/0000-0001-5537-637X>), Sudarshan Shetty [aut] (ORCID: <https://orcid.org/0000-0001-7280-9915>)",
+      "Maintainer": "Leo Lahti <leo.lahti@iki.fi>"
+    },
     "mime": {
       "Package": "mime",
       "Version": "0.13",
@@ -7343,6 +7638,51 @@
       "Author": "Jeroen Ooms [aut, cre] (ORCID: <https://orcid.org/0000-0002-4035-0289>), Oliver Keyes [ctb]",
       "Maintainer": "Jeroen Ooms <jeroenooms@gmail.com>",
       "Repository": "RSPM"
+    },
+    "openxlsx": {
+      "Package": "openxlsx",
+      "Version": "4.2.8.1",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Read, Write and Edit xlsx Files",
+      "Date": "2025-10-30",
+      "Authors@R": "c(person(given = \"Philipp\", family = \"Schauberger\", role = \"aut\", email = \"philipp@schauberger.co.at\"), person(given = \"Alexander\", family = \"Walker\", role = \"aut\", email = \"Alexander.Walker1989@gmail.com\"), person(given = \"Luca\", family = \"Braglia\", role = \"ctb\"), person(given = \"Joshua\", family = \"Sturm\", role = \"ctb\"), person(given = \"Jan Marvin\", family = \"Garbuszus\", role = c(\"ctb\", \"cre\"), email = \"jan.garbuszus@ruhr-uni-bochum.de\"), person(given = \"Jordan Mark\", family = \"Barbone\", role = \"ctb\", email = \"jmbarbone@gmail.com\", comment = c(ORCID = \"0000-0001-9788-3628\")), person(given = \"David\", family = \"Zimmermann\", role = \"ctb\", email = \"david_j_zimmermann@hotmail.com\"), person(given = \"Reinhold\", family = \"Kainhofer\", role = \"ctb\", email = \"reinhold@kainhofer.com\"))",
+      "Description": "Simplifies the creation of Excel .xlsx files by providing a high level interface to writing, styling and editing worksheets. Through the use of 'Rcpp', read/write times are comparable to the 'xlsx' and 'XLConnect' packages with the added benefit of removing the dependency on Java.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://ycphs.github.io/openxlsx/index.html, https://github.com/ycphs/openxlsx",
+      "BugReports": "https://github.com/ycphs/openxlsx/issues",
+      "Depends": [
+        "R (>= 3.3.0)"
+      ],
+      "Imports": [
+        "grDevices",
+        "methods",
+        "Rcpp",
+        "stats",
+        "stringi",
+        "utils",
+        "zip"
+      ],
+      "Suggests": [
+        "curl",
+        "formula.tools",
+        "knitr",
+        "rmarkdown",
+        "testthat"
+      ],
+      "LinkingTo": [
+        "Rcpp"
+      ],
+      "VignetteBuilder": "knitr",
+      "Encoding": "UTF-8",
+      "Language": "en-US",
+      "RoxygenNote": "7.3.3",
+      "Collate": "'CommentClass.R' 'HyperlinkClass.R' 'RcppExports.R' 'class_definitions.R' 'StyleClass.R' 'WorkbookClass.R' 'asserts.R' 'baseXML.R' 'borderFunctions.R' 'build_workbook.R' 'chartsheet_class.R' 'conditional_formatting.R' 'data-fontSizeLookupTables.R' 'helperFunctions.R' 'loadWorkbook.R' 'onUnload.R' 'openXL.R' 'openxlsx-package.R' 'openxlsx.R' 'openxlsxCoerce.R' 'readWorkbook.R' 'setWindowSize.R' 'sheet_data_class.R' 'utils.R' 'workbook_column_widths.R' 'workbook_read_workbook.R' 'workbook_write_data.R' 'worksheet_class.R' 'wrappers.R' 'writeData.R' 'writeDataTable.R' 'writexlsx.R' 'zzz.R'",
+      "LazyData": "true",
+      "NeedsCompilation": "yes",
+      "Author": "Philipp Schauberger [aut], Alexander Walker [aut], Luca Braglia [ctb], Joshua Sturm [ctb], Jan Marvin Garbuszus [ctb, cre], Jordan Mark Barbone [ctb] (ORCID: <https://orcid.org/0000-0001-9788-3628>), David Zimmermann [ctb], Reinhold Kainhofer [ctb]",
+      "Maintainer": "Jan Marvin Garbuszus <jan.garbuszus@ruhr-uni-bochum.de>",
+      "Repository": "CRAN"
     },
     "osqp": {
       "Package": "osqp",
@@ -8905,6 +9245,65 @@
       "Maintainer": "Renaud Gaujoux <renozao@protonmail.com>",
       "Repository": "RSPM"
     },
+    "robustbase": {
+      "Package": "robustbase",
+      "Version": "0.99-7",
+      "Source": "Repository",
+      "VersionNote": "Released 0.99-6 on 2025-09-03, 0.99-5 on 2024-11-01, 0.99-4-1 on 2024-09-24, 0.99-4 on 2024-08-19 to CRAN",
+      "Date": "2026-02-03",
+      "Title": "Basic Robust Statistics",
+      "Authors@R": "c(person(\"Martin\",\"Maechler\", role=c(\"aut\",\"cre\"), email=\"maechler@stat.math.ethz.ch\", comment = c(ORCID = \"0000-0002-8685-9910\")) , person(\"Peter\", \"Rousseeuw\", role=\"ctb\", comment = \"Qn and Sn\") , person(\"Christophe\", \"Croux\", role=\"ctb\", comment = \"Qn and Sn\") , person(\"Valentin\", \"Todorov\", role = \"aut\", email = \"valentin.todorov@chello.at\", comment = \"most robust Cov\") , person(\"Andreas\", \"Ruckstuhl\", role = \"aut\", email = \"andreas.ruckstuhl@zhaw.ch\", comment = \"nlrob, anova, glmrob\") , person(\"Matias\", \"Salibian-Barrera\", role = \"aut\", email = \"matias@stat.ubc.ca\", comment = \"lmrob orig.\") , person(\"Tobias\", \"Verbeke\", role = c(\"ctb\",\"fnd\"), email = \"tobias.verbeke@openanalytics.eu\", comment = \"mc, adjbox\") , person(\"Manuel\", \"Koller\", role = \"aut\", email = \"koller.manuel@gmail.com\", comment = \"mc, lmrob, psi-func.\") , person(c(\"Eduardo\", \"L. T.\"), \"Conceicao\", role = \"aut\", email = \"mail@eduardoconceicao.org\", comment = \"MM-, tau-, CM-, and MTL- nlrob\") , person(\"Maria\", \"Anna di Palma\", role = \"ctb\", comment = \"initial version of Comedian\") )",
+      "URL": "https://robustbase.R-forge.R-project.org/, https://R-forge.R-project.org/R/?group_id=59, https://R-forge.R-project.org/scm/viewvc.php/pkg/robustbase/?root=robustbase, svn://svn.r-forge.r-project.org/svnroot/robustbase/pkg/robustbase",
+      "BugReports": "https://R-forge.R-project.org/tracker/?atid=302&group_id=59",
+      "Description": "\"Essential\" Robust Statistics. Tools allowing to analyze data with robust methods.  This includes regression methodology including model selections and multivariate statistics where we strive to cover the book \"Robust Statistics, Theory and Methods\" by 'Maronna, Martin and Yohai'; Wiley 2006.",
+      "Depends": [
+        "R (>= 3.5.0)"
+      ],
+      "Imports": [
+        "stats",
+        "graphics",
+        "utils",
+        "methods",
+        "DEoptimR"
+      ],
+      "Suggests": [
+        "grid",
+        "MASS",
+        "lattice",
+        "boot",
+        "cluster",
+        "Matrix",
+        "robust",
+        "fit.models",
+        "MPV",
+        "xtable",
+        "ggplot2",
+        "GGally",
+        "RColorBrewer",
+        "reshape2",
+        "sfsmisc",
+        "catdata",
+        "doParallel",
+        "foreach",
+        "skewt"
+      ],
+      "SuggestsNote": "mostly only because of vignette graphics and simulation",
+      "Enhances": [
+        "robustX",
+        "rrcov",
+        "matrixStats",
+        "quantreg",
+        "Hmisc"
+      ],
+      "EnhancesNote": "linked to in man/*.Rd",
+      "LazyData": "yes",
+      "NeedsCompilation": "yes",
+      "License": "GPL (>= 2)",
+      "Author": "Martin Maechler [aut, cre] (ORCID: <https://orcid.org/0000-0002-8685-9910>), Peter Rousseeuw [ctb] (Qn and Sn), Christophe Croux [ctb] (Qn and Sn), Valentin Todorov [aut] (most robust Cov), Andreas Ruckstuhl [aut] (nlrob, anova, glmrob), Matias Salibian-Barrera [aut] (lmrob orig.), Tobias Verbeke [ctb, fnd] (mc, adjbox), Manuel Koller [aut] (mc, lmrob, psi-func.), Eduardo L. T. Conceicao [aut] (MM-, tau-, CM-, and MTL- nlrob), Maria Anna di Palma [ctb] (initial version of Comedian)",
+      "Maintainer": "Martin Maechler <maechler@stat.math.ethz.ch>",
+      "Repository": "RSPM",
+      "Encoding": "UTF-8"
+    },
     "rootSolve": {
       "Package": "rootSolve",
       "Version": "1.8.2.4",
@@ -10004,6 +10403,25 @@
       "Maintainer": "William Michael Landau <will.landau.oss@gmail.com>",
       "Repository": "CRAN"
     },
+    "tensorA": {
+      "Package": "tensorA",
+      "Version": "0.36.2.1",
+      "Source": "Repository",
+      "Date": "2020-11-13",
+      "Title": "Advanced Tensor Arithmetic with Named Indices",
+      "Author": "K. Gerald van den Boogaart <boogaart@uni-greifswald.de>",
+      "Maintainer": "K. Gerald van den Boogaart <boogaart@math.tu-freiberg.de>",
+      "Depends": [
+        "R (>= 2.2.0)",
+        "stats"
+      ],
+      "Description": "Provides convenience functions for advanced linear algebra with tensors and computation with data sets of tensors on a higher level abstraction. It includes Einstein and Riemann summing conventions, dragging, co- and contravariate indices, parallel computations on sequences of tensors.",
+      "License": "GPL (>= 2)",
+      "URL": "http://www.stat.boogaart.de/tensorA/",
+      "NeedsCompilation": "yes",
+      "Repository": "RSPM",
+      "Encoding": "UTF-8"
+    },
     "textshaping": {
       "Package": "textshaping",
       "Version": "1.0.5",
@@ -11022,7 +11440,7 @@
     },
     "xml2": {
       "Package": "xml2",
-      "Version": "1.5.2",
+      "Version": "1.6.0",
       "Source": "Repository",
       "Title": "Parse XML",
       "Authors@R": "c( person(\"Hadley\", \"Wickham\", role = \"aut\"), person(\"Jim\", \"Hester\", role = \"aut\"), person(\"Jeroen\", \"Ooms\", email = \"jeroenooms@gmail.com\", role = c(\"aut\", \"cre\")), person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\")), person(\"R Foundation\", role = \"ctb\", comment = \"Copy of R-project homepage cached as example\") )",
@@ -11053,7 +11471,7 @@
       "Encoding": "UTF-8",
       "RoxygenNote": "7.3.3",
       "SystemRequirements": "libxml2: libxml2-dev (deb), libxml2-devel (rpm)",
-      "Collate": "'S4.R' 'as_list.R' 'xml_parse.R' 'as_xml_document.R' 'classes.R' 'format.R' 'import-standalone-obj-type.R' 'import-standalone-purrr.R' 'import-standalone-types-check.R' 'init.R' 'nodeset_apply.R' 'paths.R' 'utils.R' 'xml2-package.R' 'xml_attr.R' 'xml_children.R' 'xml_document.R' 'xml_find.R' 'xml_missing.R' 'xml_modify.R' 'xml_name.R' 'xml_namespaces.R' 'xml_node.R' 'xml_nodeset.R' 'xml_path.R' 'xml_schema.R' 'xml_serialize.R' 'xml_structure.R' 'xml_text.R' 'xml_type.R' 'xml_url.R' 'xml_write.R' 'zzz.R'",
+      "Collate": "'S4.R' 'as_list.R' 'xml_parse.R' 'as_xml_document.R' 'classes.R' 'format.R' 'import-standalone-obj-type.R' 'import-standalone-purrr.R' 'import-standalone-types-check.R' 'init.R' 'nodeset_apply.R' 'paths.R' 'utils.R' 'xml2-package.R' 'xml_attr.R' 'xml_children.R' 'xml_document.R' 'xml_find.R' 'xml_missing.R' 'xml_modify.R' 'xml_name.R' 'xml_namespaces.R' 'xml_node.R' 'xml_nodeset.R' 'xml_path.R' 'xml_schema.R' 'xml_serialize.R' 'xml_structure.R' 'xml_text.R' 'xml_type.R' 'xml_url.R' 'xml_write.R'",
       "Config/testthat/edition": "3",
       "NeedsCompilation": "yes",
       "Author": "Hadley Wickham [aut], Jim Hester [aut], Jeroen Ooms [aut, cre], Posit Software, PBC [cph, fnd], R Foundation [ctb] (Copy of R-project homepage cached as example)",
@@ -11149,6 +11567,42 @@
       "Author": "Guangchuang Yu [aut, cre] (ORCID: <https://orcid.org/0000-0002-6485-8781>)",
       "Maintainer": "Guangchuang Yu <guangchuangyu@gmail.com>",
       "Repository": "RSPM"
+    },
+    "zip": {
+      "Package": "zip",
+      "Version": "3.0.2",
+      "Source": "Repository",
+      "Title": "Cross-Platform 'zip' Compression",
+      "Authors@R": "c( person(\"Gábor\", \"Csárdi\", , \"csardi.gabor@gmail.com\", role = c(\"aut\", \"cre\")), person(\"Kuba\", \"Podgórski\", role = \"ctb\"), person(\"Rich\", \"Geldreich\", role = \"ctb\"), person(\"Arm Limited\", role = c(\"ctb\", \"cph\"), comment = \"bundled Mbed TLS crypto subset in src/mbedtls/ (Apache-2.0)\"), person(\"Posit Software, PBC\", role = c(\"cph\", \"fnd\"), comment = c(ROR = \"03wc8by49\")) )",
+      "Description": "Cross-Platform 'zip' Compression Library. A replacement for the 'zip' function, that does not require any additional external tools on any platform.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://github.com/r-lib/zip, https://r-lib.github.io/zip/",
+      "BugReports": "https://github.com/r-lib/zip/issues",
+      "LinkingTo": [
+        "cli"
+      ],
+      "Suggests": [
+        "callr",
+        "cli",
+        "curl",
+        "pillar",
+        "processx",
+        "R6",
+        "testthat",
+        "webfakes",
+        "withr"
+      ],
+      "Config/Needs/website": "tidyverse/tidytemplate",
+      "Config/testthat/edition": "3",
+      "Config/testthat/parallel": "true",
+      "Config/testthat/start-first": "large-files, http",
+      "Config/usethis/last-upkeep": "2025-05-07",
+      "Encoding": "UTF-8",
+      "Config/roxygen2/version": "8.0.0",
+      "NeedsCompilation": "yes",
+      "Author": "Gábor Csárdi [aut, cre], Kuba Podgórski [ctb], Rich Geldreich [ctb], Arm Limited [ctb, cph] (bundled Mbed TLS crypto subset in src/mbedtls/ (Apache-2.0)), Posit Software, PBC [cph, fnd] (ROR: <https://ror.org/03wc8by49>)",
+      "Maintainer": "Gábor Csárdi <csardi.gabor@gmail.com>",
+      "Repository": "CRAN"
     },
     "zoo": {
       "Package": "zoo",
