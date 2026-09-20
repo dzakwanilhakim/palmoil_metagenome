@@ -126,7 +126,7 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
                                      gold_rarefied_species_its, gold_universe_lookup_its,
                                      gold_processed_matrix_its_species,
                                      style = load_plot_style(), root = "Results",
-                                     top_ns = c(10, 15)) {
+                                     top_ns = c(10, 15), combined_kebun = NULL) {
   written <- character(0)
 
   run_marker <- function(rarefied_list, lookup, processed_species, marker) {
@@ -138,16 +138,20 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
 
       long <- gold_rarefied_species_long(mat, processed_species, lookup, st)
       if (nrow(long) == 0) next
-      fields <- sort(unique(long$field))
+      definitions <- analysis_field_definitions(
+        lookup, marker, st, combined_kebun)
       all_ferts <- fert_rows_for_stage(st)
-      message("=== GOLD RELABUND ", ucode, " (", length(fields), " fields) ===")
+      message("=== GOLD RELABUND ", ucode, " (", nrow(definitions),
+              " original/combined fields) ===")
 
       for (rank in c("phylum", "genus", "species")) {
         top_n_this_rank <- if (rank == "species") 15 else top_ns
 
         ## Goal B — per field
-        for (fld in fields) {
-          lf <- dplyr::filter(long, field == fld)
+        for (i in seq_len(nrow(definitions))) {
+          definition <- definitions[i, , drop = FALSE]
+          fld <- definition$field[[1]]
+          lf <- analysis_field_subset(long, definition)
           if (nrow(lf) == 0) next
           leaf <- file.path(udir, "Goal_B_Intra_Longitudinal", fld)
           dir.create(leaf, recursive = TRUE, showWarnings = FALSE)

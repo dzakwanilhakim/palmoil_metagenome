@@ -173,7 +173,8 @@ compute_beta_gold <- function(rarefied_mat) {
 
 build_gold_beta_goal_tree <- function(gold_rarefied_species_16s, gold_universe_lookup_16s,
                                       gold_rarefied_species_its, gold_universe_lookup_its,
-                                      style = load_plot_style(), root = "Results") {
+                                      style = load_plot_style(), root = "Results",
+                                      combined_kebun = NULL) {
   written <- character(0); perm_rows <- list()
 
   run_marker <- function(rarefied_list, lookup, marker) {
@@ -188,28 +189,36 @@ build_gold_beta_goal_tree <- function(gold_rarefied_species_16s, gold_universe_l
       # only draws legend keys for values actually present in the data, so
       # passing the full T0..T4 palette here is safe (no unused-level clutter).
       time_pal <- waktu_palette()
-      fields <- sort(unique(meta$field[meta$id_sampel %in% rownames(mat)]))
-      message("=== GOLD BETA GOALS ", ucode, " (", length(fields), " fields) ===")
+      definitions <- analysis_field_definitions(
+        lookup, marker, st, combined_kebun)
+      message("=== GOLD BETA GOALS ", ucode, " (", nrow(definitions),
+              " original/combined fields) ===")
 
       ## Goal B — per field
-      for (fld in fields) {
-        ids <- meta$id_sampel[meta$field == fld]
+      for (i in seq_len(nrow(definitions))) {
+        definition <- definitions[i, , drop = FALSE]
+        fld <- definition$field[[1]]
+        lookup_sub <- analysis_field_subset(
+          dplyr::filter(lookup, stage == st), definition)
+        meta_sub <- .beta_meta(lookup_sub, st)
+        ids <- meta_sub$id_sampel
         sub_mat <- mat[intersect(ids, rownames(mat)), , drop = FALSE]
         if (nrow(sub_mat) < 3) next
         leaf <- file.path(udir, GOAL_DIR["B"], fld)
         dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
 
         beta <- compute_beta_gold(sub_mat)
-        o <- plot_ordination(beta, meta, color_var = "timepoint", shape_var = NULL,
+        o <- plot_ordination(beta, meta_sub, color_var = "timepoint", shape_var = NULL,
               facet_var = NULL, pal = time_pal,
               title = paste0(ucode, " — Goal B — ", fld, " — Bray-Curtis PCoA"),
               out_path = file.path(leaf, "beta_ord_bray_curtis.png"))
         if (!is.na(o)) written <<- c(written, o)
 
-        g <- plot_beta_dendrogram(sub_mat, lookup, marker, st, style, out_dir = leaf)
+        g <- plot_beta_dendrogram(sub_mat, lookup_sub, marker, st, style,
+                                  out_dir = leaf)
         if (!is.na(g)) written <<- c(written, g)
 
-        pm <- run_beta_permanova(sub_mat, lookup, marker, st,
+        pm <- run_beta_permanova(sub_mat, lookup_sub, marker, st,
                                  formula_rhs = "waktu", strata_var = NULL)
         perm_rows[[paste0(ucode, "_B_", fld)]] <<-
           dplyr::mutate(pm, field = fld, goal = "B", .before = 1)

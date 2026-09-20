@@ -231,8 +231,11 @@ list(
              "config/analysis_cohorts.yaml", format = "file"),
   tar_target(analysis_cohorts,
              load_analysis_cohorts(analysis_cohorts_file)),
+  tar_target(combined_kebun,
+             load_combined_kebun(analysis_cohorts_file, analysis_cohorts)),
   tar_target(analysis_cohorts_csv,
-             write_analysis_cohorts(analysis_cohorts), format = "file"),
+             write_analysis_cohorts(analysis_cohorts, combined_kebun),
+             format = "file"),
 
   tar_target(selected_gold_qc_16s,
              subset_gold_qc_cohorts(gold_qc_16s, "16S", analysis_cohorts)),
@@ -359,21 +362,25 @@ list(
 
   # ---- data_counts (synchronized from established pipeline) ----------------
   tar_target(gold_count_tables,
-             build_gold_count_tables(gold_universe_lookup_16s, gold_universe_lookup_its),
+             build_gold_count_tables(gold_universe_lookup_16s,
+                                     gold_universe_lookup_its,
+                                     combined_kebun),
              format = "file"),
 
   # ---- Goal A/B/C/D alpha report tree (synchronized, Shannon-only) ---------
   #   `comparisons` is declared in the established-pipeline Stage 4 block
   #   below; targets resolves the dependency by reference, not list order.
   tar_target(gold_report_tree,
-             build_gold_report_tree(alpha_shannon, comparisons, plot_style),
+             build_gold_report_tree(alpha_shannon, comparisons, plot_style,
+                                    combined_kebun = combined_kebun),
              format = "file"),
 
   # ---- Goal B/D beta breakdown (synchronized, Bray-Curtis only) -----------
   tar_target(beta_goal_tree,
              build_gold_beta_goal_tree(gold_rarefied_species_16s, gold_universe_lookup_16s,
                                        gold_rarefied_species_its, gold_universe_lookup_its,
-                                       plot_style)),
+                                       plot_style,
+                                       combined_kebun = combined_kebun)),
   tar_target(beta_goal_tree_plots, beta_goal_tree$plots, format = "file"),
   tar_target(beta_goal_tree_permanova_csv, beta_goal_tree$permanova_csv, format = "file"),
 
@@ -384,7 +391,8 @@ list(
                                       gold_processed_matrix_16s_species,
                                       gold_rarefied_species_its, gold_universe_lookup_its,
                                       gold_processed_matrix_its_species,
-                                      plot_style),
+                                      plot_style,
+                                      combined_kebun = combined_kebun),
              format = "file"),
 
   # ---- Temporal DA (ANCOM-BC2): per kebun, fertilizers pooled ------------
@@ -397,7 +405,8 @@ list(
                                     gold_processed_matrix_its_genus,
                                     gold_processed_matrix_its_species,
                                     gold_universe_lookup_its,
-                                    analysis_thresholds, plot_style)),
+                                    analysis_thresholds, plot_style,
+                                    combined_kebun = combined_kebun)),
   tar_target(gold_temporal_da_files, gold_temporal_da$files, format = "file"),
 
   # ---- FAPROTAX functional inference: per kebun, fertilizers pooled -------
@@ -419,7 +428,8 @@ list(
   tar_target(faprotax_temporal,
              build_faprotax_temporal(faprotax_annotation,
                                      gold_universe_lookup_16s,
-                                     analysis_thresholds, plot_style)),
+                                     analysis_thresholds, plot_style,
+                                     combined_kebun = combined_kebun)),
   tar_target(faprotax_temporal_files, faprotax_temporal$files, format = "file"),
 
   # ---- shared config: comparisons.yaml (Goal A/B/C/D definitions) ---------

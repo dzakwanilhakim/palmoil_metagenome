@@ -21,7 +21,8 @@ gold_alpha_for_report <- function(alpha_shannon) {
 }
 
 build_gold_report_tree <- function(alpha_shannon, comparisons,
-                                   style = load_plot_style(), root = "Results") {
+                                   style = load_plot_style(), root = "Results",
+                                   combined_kebun = NULL) {
   d_all <- gold_alpha_for_report(alpha_shannon)
   universes <- list_universes(d_all)
   written <- character(0)
@@ -36,20 +37,36 @@ build_gold_report_tree <- function(alpha_shannon, comparisons,
     message("=== GOLD Universe ", ucode, " (", nrow(d_u), " samples, Shannon only) ===")
 
     stats_u <- universe_alpha_stats(d_all, comparisons, mk, st)
-    fields  <- sort(unique(d_u$field))
+    definitions <- analysis_field_definitions(
+      d_u, mk, st, combined_kebun)
+    fields <- definitions$field
+    field_data <- stats::setNames(
+      lapply(seq_len(nrow(definitions)), function(i)
+        analysis_field_subset(d_u, definitions[i, , drop = FALSE])),
+      fields)
+    # Preserve the established multiple-testing family for original kebun.
+    # Virtual groups get their own A/B statistics without entering C/D or
+    # changing any original-field p-value adjustment.
+    virtual_stats <- list()
+    for (i in which(definitions$is_combined)) {
+      fld <- definitions$field[[i]]
+      virtual_stats[[fld]] <- universe_alpha_stats(
+        field_data[[fld]], comparisons, mk, st)
+    }
 
     ## Goal A — one combined-timepoint figure per field
     for (fld in fields) {
       leaf <- file.path(udir, GOAL_DIR["A"], fld)
       dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
-      dsub <- dplyr::filter(d_u, field == fld)
+      dsub <- field_data[[fld]]
       w <- plot_goalA_field(dsub, pal,
             title = paste0(ucode, " — Goal A — ", fld),
             out_path = file.path(leaf, paste0("alpha_box_", fld, ".png")),
             metrics = "Shannon", style = style,
             chart_type = "bar", y_limits = c(0, NA))
       if (!is.na(w)) written <- c(written, w)
-      sl <- dplyr::filter(stats_u$global, goal == "A",
+      stats_field <- virtual_stats[[fld]] %||% stats_u
+      sl <- dplyr::filter(stats_field$global, goal == "A",
                           grepl(paste0("field=", fld, "(;|$)"), context))
       readr::write_csv(sl, file.path(leaf, paste0("stats_A_", fld, ".csv")))
     }
@@ -58,13 +75,15 @@ build_gold_report_tree <- function(alpha_shannon, comparisons,
     for (fld in fields) {
       leaf <- file.path(udir, GOAL_DIR["B"], fld)
       dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
-      dsub <- dplyr::filter(d_u, field == fld)
+      dsub <- field_data[[fld]]
       w <- plot_trajectory_metric(dsub, "Shannon", pal,
             title = paste0(ucode, " — Goal B — ", fld, " — Shannon"),
             out_path = file.path(leaf, paste0("alpha_traj_", fld, "_shannon.png")),
             facet_field = FALSE, style = style, y_limits = c(0, NA))
       if (!is.na(w)) written <- c(written, w)
-      sl <- dplyr::filter(stats_u$global, goal %in% c("B", "B_per_fertilizer"),
+      stats_field <- virtual_stats[[fld]] %||% stats_u
+      sl <- dplyr::filter(stats_field$global,
+                          goal %in% c("B", "B_per_fertilizer"),
                           grepl(paste0("field=", fld, "(;| |$)"), context))
       readr::write_csv(sl, file.path(leaf, paste0("stats_B_", fld, ".csv")))
     }

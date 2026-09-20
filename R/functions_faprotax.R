@@ -590,7 +590,8 @@ plot_faprotax_coverage <- function(coverage, style = load_plot_style(), out_path
 build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
                                     analysis_thresholds,
                                     style = load_plot_style(),
-                                    root = "Results") {
+                                    root = "Results",
+                                    combined_kebun = NULL) {
   cfg <- analysis_thresholds$faprotax
   cutoff <- as.numeric(.fap_cfg(cfg$adj_pval_cutoff, 0.05))
   min_samples <- as.integer(.fap_cfg(cfg$min_samples_per_timepoint, 2L))
@@ -640,9 +641,12 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
     stage_meta <- dplyr::filter(lookup_16s, stage == st)
     pairs <- consecutive_time_pairs(stage_meta$waktu)
     if (nrow(pairs) == 0) next
-    fields <- sort(unique(stats::na.omit(stage_meta$field)))
-    for (fld in fields) {
-      field_meta <- dplyr::filter(stage_meta, field == fld)
+    definitions <- analysis_field_definitions(
+      lookup_16s, "16S", st, combined_kebun)
+    for (field_i in seq_len(nrow(definitions))) {
+      definition <- definitions[field_i, , drop = FALSE]
+      fld <- definition$field[[1]]
+      field_meta <- analysis_field_subset(stage_meta, definition)
       for (pair_i in seq_len(nrow(pairs))) {
         earlier <- pairs$earlier[[pair_i]]
         later <- pairs$later[[pair_i]]
@@ -678,17 +682,22 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
     cohort <- paste0("16S_", st)
     cohort_results <- dplyr::filter(results_tbl, stage == st)
     if (nrow(cohort_results) == 0) next
+    definitions <- analysis_field_definitions(
+      lookup_16s, "16S", st, combined_kebun)
+    original_fields <- definitions$field[!definitions$is_combined]
+    overview_results <- dplyr::filter(
+      cohort_results, field %in% original_fields)
     overview_dir <- file.path(root, cohort, "Functional_FAPROTAX")
     dir.create(overview_dir, recursive = TRUE, showWarnings = FALSE)
     heatmap_path <- file.path(overview_dir, "faprotax_effect_heatmap.png")
     trajectory_path <- file.path(overview_dir, "faprotax_trajectories.png")
-    selected <- .fap_select_functions(cohort_results, max_trajectory)
+    selected <- .fap_select_functions(overview_results, max_trajectory)
     valid_fields <- summary_tbl |>
-      dplyr::filter(stage == st, status == "ok") |>
+      dplyr::filter(stage == st, field %in% original_fields, status == "ok") |>
       dplyr::pull(field) |>
       unique()
     plot_faprotax_effect_heatmap(
-      cohort_results, max_heatmap, cutoff, style, heatmap_path)
+      overview_results, max_heatmap, cutoff, style, heatmap_path)
     plot_faprotax_trajectories(
       scores, dplyr::filter(lookup_16s, stage == st), selected, valid_fields,
       style, trajectory_path)
@@ -697,9 +706,9 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
     # Repeat all three overview visualizations within each kebun. Function
     # selection is recalculated locally so a strong signal in one kebun does
     # not determine what is displayed for another kebun.
-    stage_fields <- sort(unique(stats::na.omit(
-      dplyr::filter(lookup_16s, stage == st)$field)))
-    for (fld in stage_fields) {
+    for (field_i in seq_len(nrow(definitions))) {
+      definition <- definitions[field_i, , drop = FALSE]
+      fld <- definition$field[[1]]
       field_results <- dplyr::filter(cohort_results, field == fld)
       if (nrow(field_results) == 0) next
       field_dir <- file.path(overview_dir, .fap_safe_path(fld))
@@ -716,12 +725,14 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
         field_results, max_heatmap, cutoff, style, field_heatmap)
       plot_faprotax_trajectories(
         scores,
-        dplyr::filter(lookup_16s, stage == st, field == fld),
+        analysis_field_subset(
+          dplyr::filter(lookup_16s, stage == st), definition),
         field_functions,
         if (field_has_test) fld else character(),
         style, field_trajectory)
       plot_faprotax_coverage(
-        dplyr::filter(coverage, stage == st, field == fld),
+        analysis_field_subset(
+          dplyr::filter(coverage, stage == st), definition),
         style, field_coverage)
       written <- c(written, field_heatmap, field_trajectory, field_coverage)
     }

@@ -1,7 +1,19 @@
 # Cohorts included after the gold-QC stage.
 #
 # Default: analyze every supported cohort.
-selected: 16S_TM
+selected: ALL
+
+# Additional analysis-only kebun groups. Original kebun are always retained.
+# Groups may overlap: for example NSA contributes to both AAL and Sampoerna,
+# but is counted only once inside each group. These groups are added to every
+# per-kebun analysis and are NOT added to pooled cross-kebun analyses.
+combined_kebun:
+  AAL:
+    cohorts: [16S_TM]
+    members: [AMR, NSA]
+  Sampoerna:
+    cohorts: [16S_TM]
+    members: [AT, NSA]
 
 # To run a single cohort, use one of:
 # selected: 16S_TM
@@ -10,4 +22,3 @@ selected: 16S_TM
 #
 # Multiple cohorts are also accepted:
 # selected: [16S_TM, ITS_TM]
-

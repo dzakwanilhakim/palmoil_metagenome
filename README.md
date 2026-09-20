@@ -43,6 +43,26 @@ setting and running `targets::tar_make()` invalidates only the downstream
 branch; the complete bronze, silver, and gold-QC layers remain unchanged. The
 resolved selection is recorded in `Results/analysis/selected_cohorts.csv`.
 
+Additional, overlapping kebun groups can be declared in the same file:
+
+```yaml
+selected: 16S_TM
+combined_kebun:
+  AAL:
+    cohorts: [16S_TM]
+    members: [AMR, NSA]
+  Sampoerna:
+    cohorts: [16S_TM]
+    members: [AT, NSA]
+```
+
+Original kebun outputs are always retained. The example adds `AAL` and
+`Sampoerna` to every per-kebun analysis (counts, alpha, beta, relative
+abundance, temporal ANCOM-BC2, and FAPROTAX). Groups may overlap, but a sample
+is included only once within one group. Combined groups are intentionally
+excluded from pooled cross-kebun Goal C/D calculations and global dashboard
+summaries so samples are not double-counted.
+
 ## Project layout
 
 ```

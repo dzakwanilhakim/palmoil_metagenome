@@ -30,7 +30,7 @@ gold_field_count_grid <- function(universe_lookup, stage, field) {
 }
 
 build_gold_count_tables <- function(gold_universe_lookup_16s, gold_universe_lookup_its,
-                                    root = "Results") {
+                                    combined_kebun = NULL, root = "Results") {
   lookups <- list("16S" = gold_universe_lookup_16s, "ITS" = gold_universe_lookup_its)
   written <- character(0)
 
@@ -40,13 +40,18 @@ build_gold_count_tables <- function(gold_universe_lookup_16s, gold_universe_look
     for (st in stages) {
       ucode <- paste0(marker, "_", st)
       outdir <- file.path(root, "data_counts", ucode)
-      fields <- lookup |> dplyr::filter(stage == st) |>
-        dplyr::distinct(field) |> dplyr::pull(field) |> sort()
-      if (length(fields) == 0) next
-      message("=== GOLD COUNTS ", ucode, " (", length(fields), " fields) ===")
+      definitions <- analysis_field_definitions(
+        lookup, marker, st, combined_kebun)
+      if (nrow(definitions) == 0) next
+      message("=== GOLD COUNTS ", ucode, " (", nrow(definitions),
+              " original/combined fields) ===")
 
-      for (fld in fields) {
-        grid <- gold_field_count_grid(lookup, st, fld)
+      for (i in seq_len(nrow(definitions))) {
+        definition <- definitions[i, , drop = FALSE]
+        fld <- definition$field[[1]]
+        field_lookup <- analysis_field_subset(
+          dplyr::filter(lookup, stage == st), definition)
+        grid <- gold_field_count_grid(field_lookup, st, fld)
         out  <- file.path(outdir, paste0(fld, "_counts.png"))
         w <- tryCatch(
           render_count_png(grid,

@@ -147,13 +147,14 @@ consecutive_time_pairs <- function(timepoints) {
 }
 
 .run_temporal_field_rank <- function(processed_mat, lookup, marker, stage,
-                                     field, rank, pairs, cutoff,
+                                     field, field_members, rank, pairs, cutoff,
                                      min_samples, pseudo_sensitivity, n_cl) {
   cohort <- paste0(marker, "_", stage)
   sample_cols <- .processed_matrix_sample_columns(processed_mat)
   meta <- lookup |>
-    dplyr::filter(stage == !!stage, field == !!field,
-                  `Sample alias` %in% sample_cols)
+    dplyr::filter(stage == !!stage, .data$field %in% field_members,
+                  `Sample alias` %in% sample_cols) |>
+    dplyr::mutate(field = !!field)
   counts <- table(as.character(meta$waktu))
   pair_counts <- pairs |>
     dplyr::mutate(
@@ -316,7 +317,8 @@ build_gold_temporal_da <- function(gold_processed_matrix_16s_genus,
                                    gold_processed_matrix_its_species,
                                    gold_universe_lookup_its,
                                    analysis_thresholds,
-                                   style = load_plot_style(), root = "Results") {
+                                   style = load_plot_style(), root = "Results",
+                                   combined_kebun = NULL) {
   da_cfg <- analysis_thresholds$da
   cutoff <- as.numeric(.da_cfg(da_cfg$adj_pval_cutoff, 0.05))
   min_samples <- as.integer(.da_cfg(da_cfg$min_samples_per_timepoint, 2L))
@@ -357,10 +359,15 @@ build_gold_temporal_da <- function(gold_processed_matrix_16s_genus,
       meta <- dplyr::filter(spec$lookup, stage == st)
       pairs <- consecutive_time_pairs(meta$waktu)
       if (nrow(pairs) == 0) next
-      fields <- sort(unique(meta$field))
-      for (fld in fields) {
+      definitions <- analysis_field_definitions(
+        spec$lookup, spec$marker, st, combined_kebun)
+      for (field_i in seq_len(nrow(definitions))) {
+        fld <- definitions$field[[field_i]]
+        members <- as.character(unlist(
+          definitions$members[[field_i]], use.names = FALSE))
         result <- .run_temporal_field_rank(
-          spec$matrix, spec$lookup, spec$marker, st, fld, spec$rank, pairs,
+          spec$matrix, spec$lookup, spec$marker, st, fld, members,
+          spec$rank, pairs,
           cutoff, min_samples, pseudo_sensitivity, n_cl)
         for (pair_i in seq_len(nrow(pairs))) {
           pair_result <- dplyr::filter(
