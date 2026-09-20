@@ -5,6 +5,9 @@ channels:
 dependencies:
   - r-base=4.5
   - r-renv
+  # FAPROTAX collapse_table.py is tested on Python 3.11 and requires NumPy.
+  - python=3.11
+  - numpy
   - libxml2
   - gsl
   - udunits2

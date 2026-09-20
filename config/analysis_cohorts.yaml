@@ -1,0 +1,13 @@
+# Cohorts included after the gold-QC stage.
+#
+# Default: analyze every supported cohort.
+selected: 16S_TM
+
+# To run a single cohort, use one of:
+# selected: 16S_TM
+# selected: ITS_TM
+# selected: 16S_Nursery
+#
+# Multiple cohorts are also accepted:
+# selected: [16S_TM, ITS_TM]
+

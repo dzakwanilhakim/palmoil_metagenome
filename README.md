@@ -22,8 +22,26 @@ targets::tar_make()        # build everything (only stale targets rebuild)
 targets::tar_visnetwork()  # view the dependency graph
 ```
 
-New data = drop the batch files into `data/raw/` and re-run `tar_make()`.
+New data = drop the metadata workbook and EPI2ME HTML reports into
+`data/source/` and re-run `tar_make()`.
 Nothing is merged by hand; the pipeline compiles by barcode string.
+
+### Select analysis cohorts
+
+Gold QC and recommendation files are always built for all cohorts. To limit
+the downstream processing, dashboards, and analysis, edit
+`config/analysis_cohorts.yaml`:
+
+```yaml
+selected: all                 # default
+# selected: 16S_TM            # one cohort
+# selected: [16S_TM, ITS_TM]  # multiple cohorts
+```
+
+Supported cohorts are `16S_TM`, `ITS_TM`, and `16S_Nursery`. Changing this
+setting and running `targets::tar_make()` invalidates only the downstream
+branch; the complete bronze, silver, and gold-QC layers remain unchanged. The
+resolved selection is recorded in `Results/analysis/selected_cohorts.csv`.
 
 ## Project layout
 
@@ -50,6 +68,16 @@ Results/       generated outputs (see below)
      PERMANOVA. Generated for Goals B and D.
    - Relative abundance: Top-10 / Top-15 stacked bars (phylum + genus) +
      full CSVs.
+   - Temporal differential abundance: ANCOM-BC2 at genus and species levels,
+     one model per cohort and kebun with fertilizers pooled; exports only
+     consecutive contrasts (T0 vs T1, T1 vs T2, ...) as CSVs and dumbbell plots.
+   - FAPROTAX functional inference (16S only): normalized species profiles are
+     mapped to putative prokaryotic functions, then consecutive timepoints are
+     compared per cohort and kebun with fertilizers pooled. Wilcoxon tests use
+     BH correction. A cohort-level effect heatmap summarizes direction,
+     magnitude, and significance across kebun; selected-function trajectory
+     panels show sample distributions and means through time; pairwise
+     dumbbells retain detailed comparisons.
    - Replicate-count tables per field.
 
 ## The four analysis goals
@@ -71,8 +99,23 @@ Results/
     ├── Goal_A_Intra_Snapshot/<field>/      alpha boxplots + sliced stats
     ├── Goal_B_Intra_Longitudinal/<field>/  alpha trajectories, beta, stacked bars
     ├── Goal_C_Cross_Snapshot/              pooled alpha snapshot
-    └── Goal_D_Cross_Longitudinal/          alpha trajectories, beta, stacked bars
+    ├── Goal_D_Cross_Longitudinal/          alpha trajectories, beta, stacked bars
+    └── Differential_Abundance_Temporal/<field>/<T0_vs_T1>/<rank>/
+                                             ANCOM-BC2 CSVs + dumbbell plot
+    └── Functional_FAPROTAX/<field>/<T0_vs_T1>/
+                                             functional CSVs + dumbbell plot
 ```
+
+FAPROTAX annotation audit files are written to `data/gold/faprotax/`.
+Cross-kebun run summaries and per-sample annotation coverage are written to
+`Results/analysis/faprotax_temporal_summary.csv` and
+`Results/analysis/faprotax_annotation_coverage.csv`. Each cohort's
+`Functional_FAPROTAX/` root also contains `faprotax_effect_heatmap.png` and
+`faprotax_trajectories.png`; the coverage QC plot is in `Results/analysis/`.
+The same three visualizations are also generated inside every kebun directory,
+using functions ranked from that kebun alone:
+`faprotax_effect_heatmap.png`, `faprotax_trajectories.png`, and
+`faprotax_annotation_coverage.png`.
 
 ## Important notes
 

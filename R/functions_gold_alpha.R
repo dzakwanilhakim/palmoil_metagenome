@@ -26,11 +26,18 @@ compute_shannon_universe <- function(rarefied_universe) {
 build_alpha_shannon <- function(gold_rarefied_species_16s, gold_universe_lookup_16s,
                                 gold_rarefied_species_its, gold_universe_lookup_its) {
   one_marker <- function(rarefied_list, lookup, marker) {
-    purrr::map_dfr(names(rarefied_list), function(st) {
+    out <- purrr::map_dfr(names(rarefied_list), function(st) {
       compute_shannon_universe(rarefied_list[[st]]) |>
         dplyr::mutate(marker = marker, stage = st)
-    }) |>
-      dplyr::left_join(lookup, by = c("Sample alias", "stage"))
+    })
+
+    # A cohort selection may intentionally leave one marker with no stages.
+    # Preserve the join keys so the other marker can still be analyzed.
+    if (length(rarefied_list) == 0) {
+      out <- tibble::tibble(`Sample alias` = character(), Shannon = double(),
+                            marker = character(), stage = character())
+    }
+    dplyr::left_join(out, lookup, by = c("Sample alias", "stage"))
   }
   dplyr::bind_rows(
     one_marker(gold_rarefied_species_16s, gold_universe_lookup_16s, "16S"),

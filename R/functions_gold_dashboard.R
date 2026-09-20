@@ -83,7 +83,7 @@ build_qc_status_pie <- function(gold_qc_16s, gold_qc_its, style = load_plot_styl
   sample_cols <- setdiff(names(mat), c(taxon_col, meta_cols))
   tibble::tibble(`Sample alias` = sample_cols,
                  depth = colSums(mat[, sample_cols, drop = FALSE]),
-                 marker = marker)
+                 marker = rep(marker, length(sample_cols)))
 }
 
 build_prepost_depth_plot <- function(gold_qc_16s, gold_qc_its,

@@ -224,6 +224,28 @@ list(
                            "data/gold/gold_matrix_its_species.csv"),
              format = "file"),
 
+  # ===== COHORT GATE — applied only AFTER complete gold QC =================
+  # Gold QC, recommendations, and gold matrices above always cover all data.
+  # Everything below this point uses only the configured cohort(s).
+  tar_target(analysis_cohorts_file,
+             "config/analysis_cohorts.yaml", format = "file"),
+  tar_target(analysis_cohorts,
+             load_analysis_cohorts(analysis_cohorts_file)),
+  tar_target(analysis_cohorts_csv,
+             write_analysis_cohorts(analysis_cohorts), format = "file"),
+
+  tar_target(selected_gold_qc_16s,
+             subset_gold_qc_cohorts(gold_qc_16s, "16S", analysis_cohorts)),
+  tar_target(selected_gold_qc_its,
+             subset_gold_qc_cohorts(gold_qc_its, "ITS", analysis_cohorts)),
+
+  tar_target(selected_gold_matrix_16s,
+             purrr::map(gold_matrix_16s, gold_matrix_high_pass,
+                        selected_gold_qc_16s)),
+  tar_target(selected_gold_matrix_its,
+             purrr::map(gold_matrix_its, gold_matrix_high_pass,
+                        selected_gold_qc_its)),
+
   # ===== QC — gold -> processed matrix (taxonomic + threshold filter) =======
   #   Independent at genus and species rank (both are DA/co-occurrence
   #   targets downstream); pre-rarefaction (ANCOM-BC wants raw counts).
@@ -233,16 +255,20 @@ list(
              load_gold_processing_thresholds(gold_processing_thresholds_file)),
 
   tar_target(gold_processed_matrix_16s_genus,
-             build_gold_processed_matrix(gold_matrix_16s$genus, "16S", "genus",
+             build_gold_processed_matrix(selected_gold_matrix_16s$genus,
+                                         "16S", "genus",
                                          gold_processing_thresholds)),
   tar_target(gold_processed_matrix_16s_species,
-             build_gold_processed_matrix(gold_matrix_16s$species, "16S", "species",
+             build_gold_processed_matrix(selected_gold_matrix_16s$species,
+                                         "16S", "species",
                                          gold_processing_thresholds)),
   tar_target(gold_processed_matrix_its_genus,
-             build_gold_processed_matrix(gold_matrix_its$genus, "ITS", "genus",
+             build_gold_processed_matrix(selected_gold_matrix_its$genus,
+                                         "ITS", "genus",
                                          gold_processing_thresholds)),
   tar_target(gold_processed_matrix_its_species,
-             build_gold_processed_matrix(gold_matrix_its$species, "ITS", "species",
+             build_gold_processed_matrix(selected_gold_matrix_its$species,
+                                         "ITS", "species",
                                          gold_processing_thresholds)),
 
   tar_target(gold_processed_matrix_16s_genus_csv,
@@ -263,8 +289,10 @@ list(
              format = "file"),
 
   # ===== NORMALIZE — rarefied species matrix, per universe (marker x stage) =
-  tar_target(gold_universe_lookup_16s, build_universe_lookup(gold_qc_16s)),
-  tar_target(gold_universe_lookup_its, build_universe_lookup(gold_qc_its)),
+  tar_target(gold_universe_lookup_16s,
+             build_universe_lookup(selected_gold_qc_16s)),
+  tar_target(gold_universe_lookup_its,
+             build_universe_lookup(selected_gold_qc_its)),
 
   tar_target(gold_rarefied_species_16s,
              rarefy_species_by_universe(gold_processed_matrix_16s_species,
@@ -278,19 +306,20 @@ list(
   tar_target(plot_style, load_plot_style(plot_style_file)),
 
   tar_target(dashboard_qc_status_pie,
-             build_qc_status_pie(gold_qc_16s, gold_qc_its, plot_style),
+             build_qc_status_pie(selected_gold_qc_16s, selected_gold_qc_its,
+                                 plot_style),
              format = "file"),
   tar_target(dashboard_prepost_depth,
-             build_prepost_depth_plot(gold_qc_16s, gold_qc_its,
+             build_prepost_depth_plot(selected_gold_qc_16s, selected_gold_qc_its,
                                       gold_processed_matrix_16s_species,
                                       gold_processed_matrix_its_species,
                                       plot_style),
              format = "file"),
   tar_target(dashboard_rarefaction_curves,
-             build_rarefaction_curves(gold_matrix_16s$species,
+             build_rarefaction_curves(selected_gold_matrix_16s$species,
                                       gold_universe_lookup_16s,
                                       gold_rarefied_species_16s,
-                                      gold_matrix_its$species,
+                                      selected_gold_matrix_its$species,
                                       gold_universe_lookup_its,
                                       gold_rarefied_species_its),
              format = "file"),
@@ -358,18 +387,40 @@ list(
                                       plot_style),
              format = "file"),
 
-  # ---- DA (ANCOM-BC): Case 1 (fertilizer within field) + Case 2 (waktu ----
-  #      within field x fertilizer), genus + species, + Case 2 LFC dumbbells
-  tar_target(gold_da_analysis,
-             build_gold_da_analysis(gold_processed_matrix_16s_genus,
+  # ---- Temporal DA (ANCOM-BC2): per kebun, fertilizers pooled ------------
+  # One model per cohort x kebun x rank; export consecutive pairs only
+  # (T0 vs T1, T1 vs T2, ...), at genus and species levels.
+  tar_target(gold_temporal_da,
+             build_gold_temporal_da(gold_processed_matrix_16s_genus,
                                     gold_processed_matrix_16s_species,
                                     gold_universe_lookup_16s,
                                     gold_processed_matrix_its_genus,
                                     gold_processed_matrix_its_species,
                                     gold_universe_lookup_its,
                                     analysis_thresholds, plot_style)),
-  tar_target(gold_da_analysis_csv, gold_da_analysis$csv, format = "file"),
-  tar_target(gold_da_analysis_plots, gold_da_analysis$plots, format = "file"),
+  tar_target(gold_temporal_da_files, gold_temporal_da$files, format = "file"),
+
+  # ---- FAPROTAX functional inference: per kebun, fertilizers pooled -------
+  # FAPROTAX maps prokaryotic taxa, so this branch consumes 16S species only.
+  # Scores are normalized per sample before functional collapsing; consecutive
+  # timepoints are compared by Wilcoxon rank-sum tests with BH correction.
+  tar_target(faprotax_script_file,
+             "FAPROTAX_1.2.12/collapse_table.py", format = "file"),
+  tar_target(faprotax_database_file,
+             "FAPROTAX_1.2.12/FAPROTAX.txt", format = "file"),
+  tar_target(faprotax_annotation,
+             run_faprotax_annotation(
+               gold_processed_matrix_16s_species,
+               faprotax_script_file,
+               faprotax_database_file,
+               analysis_thresholds$faprotax$python_bin %||% "python3")),
+  tar_target(faprotax_annotation_files, faprotax_annotation$files,
+             format = "file"),
+  tar_target(faprotax_temporal,
+             build_faprotax_temporal(faprotax_annotation,
+                                     gold_universe_lookup_16s,
+                                     analysis_thresholds, plot_style)),
+  tar_target(faprotax_temporal_files, faprotax_temporal$files, format = "file"),
 
   # ---- shared config: comparisons.yaml (Goal A/B/C/D definitions) ---------
   #   Read by gold_report_tree above.

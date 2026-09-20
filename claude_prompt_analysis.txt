@@ -16,11 +16,11 @@ Analysis output:
 - Alpha diversity using only rarefied species matrix with output only Shannon diversity
 - Beta diversity using only rarefied species matrix with output only Bray Curtis ordination pcoa, dendogram (color based on time), and PERMANVA
 - Relative abundance stacked bar chart using rarefied species matrix, genus, and phylum
-- DA Analysis only using species and genus taxa ANCOM BC (so DA and Cooccurence analysis based on genus, and also on species), adj pval < 0.05
+- DA Analysis only using species and genus taxa ANCOM-BC2, adj pval < 0.05.
+  Run per cohort and Kode Kebun, pool all Kode Pupuk, and export consecutive
+  temporal contrasts only (T0 vs T1, T1 vs T2, and so on) with dumbbell plots.
 - Cooccurence analysis only using with species and genus taxa ANCOM BC, spearman >= 0.7
-- Do DA analysis and Cooccurence analysis:
- - Case 1: same kode kebun across different kode pupuk across Waktu (Genus and Species)
- - Case 2: same kode kebun, same kode pupuk, across waktu (Genus and Species)
+- Do Cooccurence analysis using the separately defined cases when activated.
 - Ignore keystone for now
 
 Notes:

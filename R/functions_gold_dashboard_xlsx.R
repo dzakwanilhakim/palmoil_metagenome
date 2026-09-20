@@ -1,8 +1,8 @@
 # =============================================================================
 # R/functions_gold_dashboard_xlsx.R  —  Dashboard summary workbook
-#   3 sheets: 16S_Nursery, 16S_TM, ITS_TM (ITS_Nursery has no data). HIGH PASS
-#   samples only -- gold_universe_lookup_{16s,its} is already restricted to
-#   HIGH PASS by build_universe_lookup(), so no extra filtering needed here.
+#   One sheet per selected, non-empty cohort: 16S_Nursery, 16S_TM, and/or
+#   ITS_TM. HIGH PASS samples only -- gold_universe_lookup_{16s,its} is already
+#   restricted by the post-gold-QC cohort gate and build_universe_lookup().
 #   Each sheet has:
 #     1. sample count per Kode Kebun (field), + a Total row
 #     2. distinct Kode Pupuk (fertilizer) count per Kode Kebun, + a Total row
@@ -69,9 +69,17 @@ build_dashboard_xlsx <- function(gold_universe_lookup_16s, gold_universe_lookup_
                                  out_path = "Results/dashboard/dashboard_summary.xlsx") {
   dir.create(dirname(out_path), showWarnings = FALSE, recursive = TRUE)
 
-  lookups <- list("16S_Nursery" = list(lookup = gold_universe_lookup_16s, stage = "Nursery"),
-                  "16S_TM"      = list(lookup = gold_universe_lookup_16s, stage = "TM"),
-                  "ITS_TM"      = list(lookup = gold_universe_lookup_its, stage = "TM"))
+  candidates <- list(
+    "16S_Nursery" = list(lookup = gold_universe_lookup_16s, stage = "Nursery"),
+    "16S_TM"      = list(lookup = gold_universe_lookup_16s, stage = "TM"),
+    "ITS_TM"      = list(lookup = gold_universe_lookup_its, stage = "TM"))
+  lookups <- candidates[purrr::map_lgl(candidates, function(x) {
+    any(!is.na(x$lookup$stage) & x$lookup$stage == x$stage)
+  })]
+
+  if (length(lookups) == 0)
+    stop("dashboard_summary.xlsx: no samples in the selected cohort(s).",
+         call. = FALSE)
 
   wb <- openxlsx::createWorkbook()
   hdr_style   <- openxlsx::createStyle(textDecoration = "bold", fgFill = "#D9E1F2",

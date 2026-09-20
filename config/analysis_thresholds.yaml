@@ -6,6 +6,25 @@
 # =============================================================================
 da:
   adj_pval_cutoff: 0.05
+  min_samples_per_timepoint: 2
+  # Recommended by ANCOM-BC2 to reduce false positives. Set false only for a
+  # faster development smoke test; do not use that shortcut for final results.
+  pseudo_sensitivity: true
+  n_cl: 1
+  max_taxa_dumbbell: 30
+
+# FAPROTAX is run on 16S species profiles only. Functional groups can overlap,
+# so consecutive timepoints are compared with Wilcoxon tests rather than
+# treating the collapsed scores as mutually exclusive compositional counts.
+faprotax:
+  adj_pval_cutoff: 0.05
+  min_samples_per_timepoint: 2
+  min_prevalence_frac: 0.10
+  pseudocount: 1.0e-6
+  max_functions_dumbbell: 20
+  max_functions_heatmap: 25
+  max_functions_trajectory: 8
+  python_bin: python3
 
 cooccurrence:
   spearman_cutoff: 0.7
