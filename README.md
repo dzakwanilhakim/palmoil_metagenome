@@ -49,11 +49,12 @@ Additional, overlapping kebun groups can be declared in the same file:
 selected: 16S_TM
 combined_kebun:
   AAL:
-    cohorts: [16S_TM]
-    members: [AMR, NSA]
+    by_cohort:
+      16S_TM: [AMR, NSA]
+      16S_Nursery: [TPP, GSDI, LTW]
   Sampoerna:
-    cohorts: [16S_TM]
-    members: [AT, NSA]
+    by_cohort:
+      16S_TM: [AT, NSA]
 ```
 
 Original kebun outputs are always retained. The example adds `AAL` and

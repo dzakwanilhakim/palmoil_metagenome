@@ -1,7 +1,7 @@
 # Cohorts included after the gold-QC stage.
 #
 # Default: analyze every supported cohort.
-selected: ALL
+selected: 16S_Nursery
 
 # Additional analysis-only kebun groups. Original kebun are always retained.
 # Groups may overlap: for example NSA contributes to both AAL and Sampoerna,
@@ -9,11 +9,13 @@ selected: ALL
 # per-kebun analysis and are NOT added to pooled cross-kebun analyses.
 combined_kebun:
   AAL:
-    cohorts: [16S_TM]
-    members: [AMR, NSA]
+    by_cohort:
+      16S_TM: [AMR, NSA]
+      # Letawa is coded as LTW in the project metadata.
+      16S_Nursery: [TPP, GSDI, LTW]
   Sampoerna:
-    cohorts: [16S_TM]
-    members: [AT, NSA]
+    by_cohort:
+      16S_TM: [AT, NSA]
 
 # To run a single cohort, use one of:
 # selected: 16S_TM

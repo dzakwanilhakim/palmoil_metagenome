@@ -67,26 +67,46 @@ load_combined_kebun <- function(path = "config/analysis_cohorts.yaml",
          "numbers, underscore, dot, and hyphen: ",
          paste(bad_names, collapse = ", "), call. = FALSE)
 
+  make_group_row <- function(group_name, cohort, members) {
+    cohort <- trimws(as.character(cohort))
+    members <- unique(trimws(as.character(unlist(members,
+                                                  use.names = FALSE))))
+    members <- members[nzchar(members)]
+    if (!cohort %in% SUPPORTED_ANALYSIS_COHORTS)
+      stop("analysis_cohorts: combined_kebun '", group_name,
+           "' has unsupported cohort: ", cohort, call. = FALSE)
+    if (length(members) < 2)
+      stop("analysis_cohorts: combined_kebun '", group_name, "' in ",
+           cohort, " must contain at least two original kebun.",
+           call. = FALSE)
+    tibble::tibble(name = group_name, cohort = cohort,
+                   members = list(members))
+  }
+
   rows <- purrr::imap_dfr(groups, function(spec, group_name) {
+    # Preferred form: different member kebun can be declared per cohort.
+    if (!is.null(spec$by_cohort)) {
+      if (is.null(names(spec$by_cohort)) ||
+          any(!nzchar(names(spec$by_cohort))))
+        stop("analysis_cohorts: combined_kebun '", group_name,
+             "' by_cohort entries must be named with cohort codes.",
+             call. = FALSE)
+      return(purrr::imap_dfr(
+        spec$by_cohort,
+        function(members, cohort)
+          make_group_row(group_name, cohort, members)))
+    }
+
+    # Backward-compatible form for identical membership across cohort(s).
     cohorts <- unique(trimws(as.character(unlist(spec$cohorts,
                                                   use.names = FALSE))))
-    members <- unique(trimws(as.character(unlist(spec$members,
-                                                  use.names = FALSE))))
     cohorts <- cohorts[nzchar(cohorts)]
-    members <- members[nzchar(members)]
-    invalid <- setdiff(cohorts, SUPPORTED_ANALYSIS_COHORTS)
-    if (length(invalid))
-      stop("analysis_cohorts: combined_kebun '", group_name,
-           "' has unsupported cohort(s): ", paste(invalid, collapse = ", "),
-           call. = FALSE)
     if (length(cohorts) == 0)
       stop("analysis_cohorts: combined_kebun '", group_name,
-           "' must specify at least one cohort.", call. = FALSE)
-    if (length(members) < 2)
-      stop("analysis_cohorts: combined_kebun '", group_name,
-           "' must contain at least two original kebun.", call. = FALSE)
-    tibble::tibble(name = group_name, cohort = cohorts,
-                   members = rep(list(members), length(cohorts)))
+           "' must specify by_cohort or at least one cohort.", call. = FALSE)
+    purrr::map_dfr(
+      cohorts,
+      function(cohort) make_group_row(group_name, cohort, spec$members))
   }) |>
     dplyr::filter(cohort %in% selected_cohorts)
 
