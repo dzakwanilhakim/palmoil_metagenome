@@ -1,7 +1,7 @@
 # Cohorts included after the gold-QC stage.
 #
 # Default: analyze every supported cohort.
-selected: 16S_Nursery
+selected: ALL
 
 # Additional analysis-only kebun groups. Original kebun are always retained.
 # Groups may overlap: for example NSA contributes to both AAL and Sampoerna,
