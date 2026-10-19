@@ -8,14 +8,14 @@ selected: ALL
 # but is counted only once inside each group. These groups are added to every
 # per-kebun analysis and are NOT added to pooled cross-kebun analyses.
 combined_kebun:
-  AAL:
-    by_cohort:
-      16S_TM: [AMR, NSA]
+  #AAL:
+    #by_cohort:
+      #16S_TM: [AMR, NSA]
       # Letawa is coded as LTW in the project metadata.
-      16S_Nursery: [TPP, GSDI, LTW]
-  Sampoerna:
-    by_cohort:
-      16S_TM: [AT, NSA]
+      #16S_Nursery: [TPP, GSDI, LTW]
+  #Sampoerna:
+    #by_cohort:
+      #16S_TM: [AT, NSA]
 
 # To run a single cohort, use one of:
 # selected: 16S_TM

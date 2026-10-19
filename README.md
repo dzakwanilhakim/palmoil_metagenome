@@ -9,11 +9,44 @@ The data is treated as **four isolated universes** — `16S_TM`, `16S_Nursery`,
 
 ## Setup
 
+Run from the repository root.
+
 ```bash
-conda env create -f environment_r.yml      # R base + system libs
+# 1. Conda env: R 4.5 + system libs + Python 3.11/NumPy (for FAPROTAX)
+mamba env create -f environment_r.yml      # or: conda env create -f ...
 conda activate palmoil
-R -e 'renv::restore()'                      # install exact package versions
+
+# 2. Exact R package versions from renv.lock (CRAN + Bioconductor 3.22,
+#    incl. ANCOMBC and phyloseq). Most packages compile from source on Linux.
+R -e 'renv::restore(prompt = FALSE)'
+
+# 3. Verify
+R -q -e '
+pkgs <- c("targets","tarchetypes","tidyverse","yaml","vegan","patchwork",
+          "permute","igraph","ggraph","pheatmap","ggrepel","readxl","rvest",
+          "xml2","phyloseq","ANCOMBC","openxlsx","viridisLite")
+ok <- vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)
+print(ok); if (!all(ok)) stop("missing: ", paste(pkgs[!ok], collapse=", "))
+targets::tar_manifest(fields = name) |> nrow() |> cat("targets in DAG\n")
+'
+python3 -c "import sys, numpy; print(sys.version.split()[0], numpy.__version__)"
+
+# 4. Input data (not tracked in git)
+mkdir -p data/source
+# copy in: <date>_metadata.xlsx, wf_16s_batch_<N>.html, wf_its_batch_<N>.html
 ```
+
+Notes:
+
+- Keep `palmoil` activated when running R: the FAPROTAX step calls `python3`
+  (`faprotax.python_bin` in `config/analysis_thresholds.yaml`).
+- If a package fails to compile on a missing library, install it into the env
+  and re-run the restore, e.g.
+  `mamba install -n palmoil -c conda-forge harfbuzz fribidi hdf5`.
+- `renv.lock` was recorded on R 4.5.3; pin `r-base=4.5.3` in
+  `environment_r.yml` if renv warns about a version mismatch.
+- `environment_py.yaml` (`palmoil_py`) is only needed for the standalone
+  scraper scripts in `scripts/`, not for the pipeline.
 
 ## Run
 
