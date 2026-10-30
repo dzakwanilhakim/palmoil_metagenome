@@ -26,10 +26,15 @@ lapply(list.files("R", pattern = "\\.R$", full.names = TRUE), source)
 list(
 
   # ===== STAGE 1 — metadata_prep (TASK 1: source xlsx -> bronze -> silver) ==
+  # The list.files() targets below use cue "always": they have no upstream
+  # dependencies, so without it targets never re-lists data/source/ and only
+  # re-hashes the files found on the first run -- new batch reports or a new
+  # metadata workbook would be silently ignored. Re-listing is cheap;
+  # downstream targets still rebuild only if the file set or contents change.
   tar_target(source_metadata_files,
              list.files("data/source", pattern = "_metadata\\.xlsx$",
                         full.names = TRUE),
-             format = "file"),
+             format = "file", cue = tar_cue(mode = "always")),
 
   tar_target(source_metadata_raw, compile_source_metadata(source_metadata_files)),
 
@@ -53,11 +58,11 @@ list(
   tar_target(wf_html_16s_files,
              list.files("data/source", pattern = "^wf_16s_batch_[0-9]+\\.html$",
                         full.names = TRUE),
-             format = "file"),
+             format = "file", cue = tar_cue(mode = "always")),
   tar_target(wf_html_its_files,
              list.files("data/source", pattern = "^wf_its_batch_[0-9]+\\.html$",
                         full.names = TRUE),
-             format = "file"),
+             format = "file", cue = tar_cue(mode = "always")),
 
   tar_target(wf_reports_16s, purrr::map(wf_html_16s_files, parse_wf_report)),
   tar_target(wf_reports_its, purrr::map(wf_html_its_files, parse_wf_report)),
@@ -223,6 +228,20 @@ list(
              write_csv_out(gold_matrix_its$species,
                            "data/gold/gold_matrix_its_species.csv"),
              format = "file"),
+
+  # ===== DATA AUDIT workbooks (all cohorts, before the cohort gate) ========
+  #   Results/dashboard/data_audit.xlsx, low_pass_hypothesis.xlsx,
+  #   data_report.xlsx — mismatches, repeat sequencing, LOW PASS follow-up,
+  #   coverage. See R/functions_gold_data_audit.R.
+  tar_target(data_audit,
+             build_data_audit(bronze_metadata, silver_metadata$all,
+                              bronze_wf_runs_16s, bronze_wf_runs_its,
+                              silver_wf_runs_16s, silver_wf_runs_its,
+                              gold_qc_16s, gold_qc_its,
+                              gold_thresholds$reads_cutoff)),
+  tar_target(data_audit_xlsx, build_data_audit_xlsx(data_audit), format = "file"),
+  tar_target(low_pass_xlsx, build_low_pass_xlsx(data_audit), format = "file"),
+  tar_target(data_report_xlsx, build_data_report_xlsx(data_audit), format = "file"),
 
   # ===== COHORT GATE — applied only AFTER complete gold QC =================
   # Gold QC, recommendations, and gold matrices above always cover all data.

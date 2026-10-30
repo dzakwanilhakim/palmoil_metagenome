@@ -161,12 +161,32 @@ compile_wf_runs <- function(reports) {
 
 # merge one rank's per-batch wide tables into a single wide matrix
 # (taxa x ALL barcodes across ALL batches; gaps filled with 0).
+#   If the same Sample alias (barcode) occurs in more than one batch -- a
+#   re-run on the same barcode -- only the latest batch's column is kept
+#   (same latest-run rule as dedup_wf_runs()); counts are never summed
+#   across runs.
 merge_rank_across_batches <- function(reports, rank) {
   long <- purrr::map_dfr(reports, function(r) {
     wide <- if (rank == "superkingdom")
       .superkingdom_from_phylum(r$matrices$phylum) else r$matrices[[rank]]
-    .wide_to_long(wide, rank)
+    .wide_to_long(wide, rank) |>
+      dplyr::mutate(.date = suppressWarnings(as.Date(r$date_run)),
+                    .batch = r$seq_batch)
   })
+
+  latest <- long |>
+    dplyr::distinct(barcode, .date, .batch) |>
+    dplyr::arrange(barcode, dplyr::desc(.date), dplyr::desc(.batch)) |>
+    dplyr::distinct(barcode, .keep_all = TRUE)
+  rerun <-long |> dplyr::distinct(barcode, .batch) |> dplyr::count(barcode) |>
+    dplyr::filter(n > 1)
+  if (nrow(rerun))
+    message("merge_rank_across_batches [", rank, "]: ", nrow(rerun),
+            " Sample alias value(s) occur in >1 batch; keeping latest batch only: ",
+            paste(utils::head(rerun$barcode, 10), collapse = ", "))
+  long <- long |>
+    dplyr::semi_join(latest, by = c("barcode", ".date", ".batch")) |>
+    dplyr::select(-.date, -.batch)
 
   meta_cols <- setdiff(names(long), c("taxon", "barcode", "count"))
   lineage <- long |>
@@ -222,30 +242,25 @@ write_csv_out <- function(df, out_path) {
 # SILVER
 # ----------------------------------------------------------------------------
 
-# 1. dedup by "No/Kode Sampel": keep the row with the latest "date run";
-#    if the latest date is tied between >1 rows, drop the whole group
-#    (ambiguous — can't determine which re-run is authoritative).
+# 1. dedup by "No/Kode Sampel": keep exactly one run per sample, the latest.
+#    Order: latest "date run", then higher seq_batch, then more Reads (only
+#    reached if the same sample appears twice in one report). Every sequenced
+#    sample therefore keeps one run; none is dropped as ambiguous.
 dedup_wf_runs <- function(bronze_runs) {
-  d <- dplyr::mutate(bronze_runs,
-                     .date_parsed = suppressWarnings(as.Date(`date run`)))
-
-  resolved <- d |>
-    dplyr::group_by(`No/Kode Sampel`) |>
-    dplyr::group_modify(function(sub, key) {
-      if (nrow(sub) == 1) return(sub)
-      mx <- max(sub$.date_parsed, na.rm = TRUE)
-      at_max <- sub[!is.na(sub$.date_parsed) & sub$.date_parsed == mx, , drop = FALSE]
-      if (nrow(at_max) == 1) return(at_max)
-      tibble::tibble()
-    }) |>
-    dplyr::ungroup() |>
+  resolved <- bronze_runs |>
+    dplyr::mutate(.date_parsed = suppressWarnings(as.Date(`date run`))) |>
+    dplyr::arrange(`No/Kode Sampel`, dplyr::desc(.date_parsed),
+                   dplyr::desc(seq_batch), dplyr::desc(Reads)) |>
+    dplyr::distinct(`No/Kode Sampel`, .keep_all = TRUE) |>
     dplyr::select(-.date_parsed)
 
-  n_in  <- dplyr::n_distinct(bronze_runs$`No/Kode Sampel`)
-  n_out <- dplyr::n_distinct(resolved$`No/Kode Sampel`)
-  message("dedup_wf_runs: ", nrow(bronze_runs), " rows / ", n_in,
-          " sample(s) -> ", nrow(resolved), " rows / ", n_out,
-          " sample(s) (", n_in - n_out, " dropped: repeat run with no later date).")
+  n_rep <- sum(duplicated(bronze_runs$`No/Kode Sampel`) |
+                 duplicated(bronze_runs$`No/Kode Sampel`, fromLast = TRUE))
+  message("dedup_wf_runs: ", nrow(bronze_runs), " runs -> ", nrow(resolved),
+          " sample(s); ", dplyr::n_distinct(
+            bronze_runs$`No/Kode Sampel`[duplicated(bronze_runs$`No/Kode Sampel`)]),
+          " sample(s) sequenced more than once (", n_rep,
+          " runs) resolved to the latest run.")
   resolved
 }
 

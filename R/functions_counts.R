@@ -13,8 +13,13 @@ TIMEPOINTS_ALL <- paste0("T", 0:4)
 FERT_TM        <- paste0("PH", 1:6)
 FERT_NURSERY   <- sprintf("PHN%02d", 1:13)
 
-fert_rows_for_stage <- function(stage) {
-  if (toupper(stage) == "NURSERY") FERT_NURSERY else FERT_TM
+# `observed` appends any fertilizer labels present in the data but outside the
+# fixed scaffold (e.g. the T0 "Untreated" baseline level), so they are neither
+# dropped from count grids nor turned into NA factor levels in plots.
+fert_rows_for_stage <- function(stage, observed = NULL) {
+  base <- if (toupper(stage) == "NURSERY") FERT_NURSERY else FERT_TM
+  extra <- setdiff(sort(unique(stats::na.omit(as.character(observed)))), base)
+  c(base, extra)
 }
 
 # build a complete fertilizer x timepoint count grid for one field

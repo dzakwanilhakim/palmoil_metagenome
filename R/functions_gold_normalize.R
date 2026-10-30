@@ -25,6 +25,13 @@ suppressPackageStartupMessages({
 # .beta_meta() didn't, so the same "HIGH PASS" sample set silently differed
 # between the two -- e.g. a lone T0 sample showing up in a Goal B PCoA but
 # never in the matching Shannon trajectory for the same field.
+#
+# Exception: T0 is the pre-treatment baseline, so a T0 sample whose name
+# carries no fertilizer number (e.g. "PAS-PHN-T0-08-SSUM") is still a valid
+# baseline sample. It is kept under the T0_UNTREATED_LABEL fertilizer level
+# instead of being dropped. Only T1+ samples with no Kode Pupuk are dropped.
+T0_UNTREATED_LABEL <- "Untreated"
+
 build_universe_lookup <- function(gold_qc) {
   d <- gold_qc |>
     dplyr::filter(!is.na(qc_status), qc_status == "HIGH PASS") |>
@@ -35,6 +42,15 @@ build_universe_lookup <- function(gold_qc) {
       field      = `Kode Kebun`,
       fertilizer = `Kode Pupuk`,
       waktu      = Waktu)
+
+  untreated <- is.na(d$fertilizer) & !is.na(d$waktu) & d$waktu == "T0"
+  if (any(untreated)) {
+    message("build_universe_lookup: keeping ", sum(untreated),
+            " T0 sample(s) with no Kode Pupuk as '", T0_UNTREATED_LABEL,
+            "' (pre-treatment baseline): ",
+            paste(d$`Nama Sampel`[untreated], collapse = ", "))
+    d$fertilizer[untreated] <- T0_UNTREATED_LABEL
+  }
 
   n_bad <- sum(is.na(d$fertilizer))
   if (n_bad > 0)

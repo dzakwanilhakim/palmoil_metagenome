@@ -10,11 +10,10 @@
 suppressPackageStartupMessages({ library(tidyverse) })
 
 gold_field_count_grid <- function(universe_lookup, stage, field) {
-  ferts <- fert_rows_for_stage(stage)
-
   obs <- universe_lookup |>
     dplyr::filter(stage == !!stage, field == !!field) |>
     dplyr::count(fertilizer, waktu, name = "n")
+  ferts <- fert_rows_for_stage(stage, obs$fertilizer)
 
   grid <- tidyr::expand_grid(fertilizer = ferts, waktu = TIMEPOINTS_ALL) |>
     dplyr::left_join(obs, by = c("fertilizer", "waktu")) |>

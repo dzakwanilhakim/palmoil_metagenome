@@ -153,8 +153,13 @@ Results/       generated outputs (see below)
 
 ```
 Results/
+├── dashboard/
+│   ├── data_audit.xlsx            metadata <-> wf mismatches (+ possible
+│   │                              matches), repeat sequencing, queued rows
+│   ├── low_pass_hypothesis.xlsx   LOW PASS samples + rule-based hypotheses
+│   ├── data_report.xlsx           overview, QC per cohort, batches, coverage
+│   └── dashboard_summary.xlsx, *.png   QC/diversity dashboard
 ├── data_counts/<universe>/<field>_counts.png   replicate inventory tables
-├── dropped_barcodes.csv / filtered_barcodes_all.csv   QC audit trail
 └── <universe>/
     ├── Goal_A_Intra_Snapshot/<field>/      alpha boxplots + sliced stats
     ├── Goal_B_Intra_Longitudinal/<field>/  alpha trajectories, beta, stacked bars
@@ -187,6 +192,15 @@ using functions ranked from that kebun alone:
 - **Replication:** 1-2 biological replicates per group; analyses are largely
   descriptive. Stats run only where a group has n>=2.
 - **ITS is TM-only** — `ITS_Nursery` is skipped (no data).
+- **Repeat sequencing:** one run per sample is used, the latest (`date run`,
+  then seq batch). A barcode re-run in a later batch replaces, never adds to,
+  the earlier counts.
+- **T0 without Kode Pupuk** (e.g. `PAS-PHN-T0-08-SSUM`) is kept as fertilizer
+  level `Untreated` (pre-treatment baseline). T1+ samples without one are
+  excluded.
+- **`-II` samples** are biological replicates from the latest sampling round
+  and are pooled with the original replicate of the same kebun x pupuk x waktu.
+- Rows with no **Batch Ekstraksi** are treated as queued and left out of QC.
 - Stats use **raw p** for plot significance markers; CSVs carry raw + BH-adjusted.
 
 ## Reproducibility

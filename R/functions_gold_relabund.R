@@ -140,7 +140,7 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
       if (nrow(long) == 0) next
       definitions <- analysis_field_definitions(
         lookup, marker, st, combined_kebun)
-      all_ferts <- fert_rows_for_stage(st)
+      all_ferts <- fert_rows_for_stage(st, long$fertilizer)
       message("=== GOLD RELABUND ", ucode, " (", nrow(definitions),
               " original/combined fields) ===")
 
