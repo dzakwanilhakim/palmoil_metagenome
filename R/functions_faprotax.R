@@ -247,14 +247,16 @@ plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
   first <- result[1, , drop = FALSE]
   sig <- result |>
     dplyr::filter(status == "ok", significant, !is.na(function_name),
-                  is.finite(mean_earlier), is.finite(mean_later)) |>
+                  is.finite(mean_earlier), is.finite(mean_later),
+                  !(excluded_from_top %in% TRUE)) |>
     dplyr::arrange(dplyr::desc(abs(delta)), q_val) |>
     dplyr::slice_head(n = max_functions)
 
   title <- paste0(first$cohort, " — ", first$field, " — ", first$contrast)
   subtitle <- stringr::str_wrap(paste0(
     "FAPROTAX functional scores; fertilizers pooled within kebun; BH q < ",
-    cutoff, "; top ", max_functions, " by absolute mean change"), width = 88)
+    cutoff, "; top ", max_functions, " by absolute mean change",
+    "; clinical/host-associated groups excluded"), width = 88)
 
   if (nrow(sig) == 0) {
     reason <- if (any(result$status == "ok")) {
@@ -359,7 +361,8 @@ plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
 
 .fap_select_functions <- function(results, n) {
   eligible <- results |>
-    dplyr::filter(status == "ok", !is.na(function_name), is.finite(delta))
+    dplyr::filter(status == "ok", !is.na(function_name), is.finite(delta),
+                  !(excluded_from_top %in% TRUE))
   # dplyr may evaluate summary expressions once for type discovery even when
   # there are no groups. Return early so skipped kebun do not call max() on an
   # empty vector while their placeholder figures are being prepared.
@@ -468,7 +471,8 @@ plot_faprotax_effect_heatmap <- function(results, max_functions, cutoff,
       title = paste0(cohort, scope, " — FAPROTAX temporal effect overview"),
       subtitle = paste0("Top ", length(selected),
                         " functions by maximum absolute mean change; ",
-                        "* BH q < ", cutoff, "; × insufficient data"),
+                        "* BH q < ", cutoff, "; × insufficient data; ",
+                        "clinical/host-associated groups excluded"),
       x = "Kebun and consecutive comparison", y = NULL) +
     gold_plot_theme(style) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
@@ -600,6 +604,7 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
   max_functions <- as.integer(.fap_cfg(cfg$max_functions_dumbbell, 20L))
   max_heatmap <- as.integer(.fap_cfg(cfg$max_functions_heatmap, 25L))
   max_trajectory <- as.integer(.fap_cfg(cfg$max_functions_trajectory, 8L))
+  exclude_top <- as.character(unlist(cfg$exclude_from_top %||% character()))
 
   if (!is.finite(cutoff) || cutoff <= 0 || cutoff >= 1)
     stop("FAPROTAX: adj_pval_cutoff must be between 0 and 1.", call. = FALSE)
@@ -621,7 +626,8 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
           ", prevalence=", min_prevalence,
           ", top functions/plot=", max_functions,
           ", heatmap=", max_heatmap, ", trajectories=", max_trajectory,
-          "; fertilizers pooled")
+          "; fertilizers pooled; excluded from Top-N: ",
+          if (length(exclude_top)) paste(exclude_top, collapse = ", ") else "none")
 
   scores <- faprotax_annotation$scores
   analysis_dir <- file.path(root, "analysis")
@@ -652,7 +658,9 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
         later <- pairs$later[[pair_i]]
         result <- .fap_test_pair(
           scores, field_meta, st, fld, earlier, later, cutoff, min_samples,
-          min_prevalence, pseudocount)
+          min_prevalence, pseudocount) |>
+          # clinical/host groups stay in the CSVs but never take a Top-N slot
+          dplyr::mutate(excluded_from_top = function_name %in% exclude_top)
         output <- .write_fap_pair(result, cutoff, max_functions, style, root)
         idx <- idx + 1L
         written <- c(written, output$files)

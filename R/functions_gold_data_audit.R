@@ -80,7 +80,7 @@ build_data_audit <- function(bronze_metadata, silver_metadata_all,
       dplyr::transmute(`No/Kode Sampel`,
                        other_marker_run = paste0(`Sample alias`, " (batch ", seq_batch,
                                                  ", ", qc_status, ", ",
-                                                 format(Mapped, big.mark = ","),
+                                                 format(Mapped, big.mark = ",", trim = TRUE),
                                                  " mapped)"))
     cutoff <- reads_cutoff[[m]]
 
@@ -189,7 +189,7 @@ build_data_audit <- function(bronze_metadata, silver_metadata_all,
       dplyr::filter(selected == "not used") |>
       dplyr::group_by(`No/Kode Sampel`) |>
       dplyr::summarise(previous_runs = paste0("batch ", seq_batch, ": ",
-                                              format(Mapped, big.mark = ","),
+                                              format(Mapped, big.mark = ",", trim = TRUE),
                                               " mapped", collapse = "; "),
                        previous_all_low = all(run_vs_cutoff == "LOW"),
                        .groups = "drop")
@@ -504,5 +504,147 @@ build_data_report_xlsx <- function(audit,
             title = "Analysable samples per cohort x Kode Kebun x Waktu")
   .xl_table(wb, "Coverage_detail", coverage_detail,
             title = "Analysable samples per Kode Kebun x Kode Pupuk x Waktu (replicate I / II)")
+  .xl_save(wb, out_path)
+}
+
+# ----------------------------------------------------------------------------
+# 4. final_metadata.xlsx — sheet "16S" then "ITS", one row per sample that
+#   requests that marker (Jenis Analisis): analysed or not, and why
+#   "Analysed" = the sample's run is in the final processed matrix that every
+#   analysis reads (HIGH PASS, selected cohort, usable name, enough reads left
+#   after the taxonomic filter). Reasons are checked in pipeline order, so each
+#   sample gets the first step that removed it.
+# ----------------------------------------------------------------------------
+.processed_depth_after_taxfilter <- function(gold_matrix_species, marker) {
+  tf <- taxonomic_filter_gold(gold_matrix_species, marker)
+  ids <- setdiff(names(tf), c(names(tf)[1], intersect(LINEAGE_COLS, names(tf))))
+  colSums(tf[, ids, drop = FALSE])
+}
+
+build_final_metadata_xlsx <- function(audit, analysis_cohorts,
+                                      lookup_16s, lookup_its,
+                                      processed_16s_species, processed_its_species,
+                                      selected_gold_matrix_16s, selected_gold_matrix_its,
+                                      processing_thresholds,
+                                      out_path = "Results/dashboard/final_metadata.xlsx") {
+  lookups   <- list("16S" = lookup_16s, ITS = lookup_its)
+  processed <- list("16S" = processed_16s_species, ITS = processed_its_species)
+  selected  <- list("16S" = selected_gold_matrix_16s$species,
+                    ITS = selected_gold_matrix_its$species)
+  low <- .low_pass_table(audit) |>
+    dplyr::select(marker, `No/Kode Sampel`, lp_hypothesis = primary_hypothesis,
+                  lp_action = recommendation)
+
+  per_marker <- purrr::map_dfr(audit$markers, function(m) {
+    pmk <- audit$per_marker[[m]]
+    cutoff <- pmk$cutoff
+    min_depth <- processing_thresholds$sample_depth[[m]]
+    proc_ids <- setdiff(names(processed[[m]]),
+                        c(names(processed[[m]])[1], LINEAGE_COLS))
+    depth_tf <- .processed_depth_after_taxfilter(selected[[m]], m)
+    lk <- lookups[[m]]
+
+    pmk$qc |>
+      dplyr::left_join(dplyr::filter(low, marker == m) |> dplyr::select(-marker),
+                       by = "No/Kode Sampel") |>
+      dplyr::left_join(dplyr::select(lk, `Sample alias`, fert_analysis = fertilizer),
+                       by = "Sample alias") |>
+      dplyr::mutate(
+        depth_tf = unname(depth_tf[`Sample alias`]),
+        cohort_ok = paste0(m, "_", `Jenis Kebun`) %in% analysis_cohorts,
+        reason = dplyr::case_when(
+          is.na(`Sample alias`) ~ "Extracted, not yet sequenced (no wf run)",
+          is.na(`Nama Sampel`) ~ "wf run has no metadata row for this marker",
+          qc_status == "LOW PASS" ~ sprintf(
+            "LOW PASS: %s mapped reads < %s cutoff. Likely: %s. Action: %s",
+            format(Mapped, big.mark = ",", trim = TRUE), format(cutoff, big.mark = ",", trim = TRUE),
+            lp_hypothesis, lp_action),
+          !cohort_ok ~ "Cohort not selected in config/analysis_cohorts.yaml",
+          is.na(Waktu) ~ "Nama Sampel has no Waktu (T<n>)",
+          is.na(fert_analysis) ~ "Nama Sampel has no Kode Pupuk (T1+ needs one)",
+          !`Sample alias` %in% proc_ids ~ sprintf(
+            "Too few target reads after taxonomic filter (%s): %s < %s",
+            if (m == "16S") "Bacteria/Archaea" else "Fungi",
+            format(dplyr::coalesce(depth_tf, 0), big.mark = ",", trim = TRUE),
+            format(min_depth, big.mark = ",", trim = TRUE)),
+          TRUE ~ "Analysed"),
+        # same checks, short category for filtering / pivoting
+        general = dplyr::case_when(
+          is.na(`Sample alias`) ~ "Queued",
+          is.na(`Nama Sampel`) ~ "No metadata",
+          qc_status == "LOW PASS" ~ "LOW PASS",
+          !cohort_ok ~ "Cohort not selected",
+          is.na(Waktu) | is.na(fert_analysis) ~ "Name issue",
+          !`Sample alias` %in% proc_ids ~ "LOW PASS after taxonomic filter",
+          TRUE ~ "Analysed"),
+        status = dplyr::case_when(general == "Analysed" ~ "Analysed",
+                                  general == "Queued" ~ "Queued",
+                                  TRUE ~ "Not analysed")) |>
+      dplyr::transmute(marker = m, `No/Kode Sampel`, wf_only = is.na(`Nama Sampel`),
+                       fert_analysis, status, general, reason, `Sample alias`, seq_batch,
+                       `date run`, Reads, Mapped,
+                       `reads after taxonomic filter` = depth_tf)
+  })
+
+  # base rows: every metadata sample (incl. queued) + wf runs without metadata
+  queued <- audit$queued |>
+    dplyr::transmute(`No/Kode Sampel`, `Nama Sampel`, `Jenis Kebun`, `Jenis Analisis`,
+                     batch = NA_integer_, date_ekstraksi = NA_character_,
+                     `Kode Kebun` = extract_kode_kebun(`Nama Sampel`),
+                     `Kode Pupuk` = extract_kode_pupuk(`Nama Sampel`),
+                     Waktu = extract_waktu(`Nama Sampel`), queued = TRUE)
+  base <- audit$meta |>
+    dplyr::transmute(`No/Kode Sampel`, `Nama Sampel`, `Jenis Kebun`, `Jenis Analisis`,
+                     batch, date_ekstraksi, `Kode Kebun`, `Kode Pupuk`, Waktu,
+                     queued = FALSE) |>
+    dplyr::bind_rows(queued)
+
+  fills <- c("Analysed" = "#E2EFDA", "Not analysed" = "#FCE4D6", "Queued" = "#FFF2CC")
+  wb <- openxlsx::createWorkbook()
+  for (m in audit$markers) {
+    # one sheet per marker: only samples whose Jenis Analisis requests it
+    # (16S + ITS samples appear on both sheets, single-marker samples on one)
+    pm_m <- dplyr::filter(per_marker, marker == m)
+    requested <- base[stringr::str_detect(dplyr::coalesce(base$`Jenis Analisis`, ""), m), ]
+    wf_only <- pm_m |>
+      dplyr::filter(wf_only, !`No/Kode Sampel` %in% requested$`No/Kode Sampel`) |>
+      dplyr::select(`No/Kode Sampel`) |>
+      dplyr::mutate(queued = FALSE)
+    sheet <- dplyr::bind_rows(requested, wf_only) |>
+      dplyr::left_join(dplyr::select(pm_m, -marker, -wf_only), by = "No/Kode Sampel") |>
+      dplyr::mutate(
+        Status = dplyr::case_when(queued ~ "Queued", !is.na(status) ~ status,
+                                  TRUE ~ "Not analysed"),
+        `General reason` = dplyr::case_when(
+          queued ~ "Queued", !is.na(general) ~ general, TRUE ~ "Unknown"),
+        Reason = dplyr::case_when(
+          queued ~ "No Batch Ekstraksi yet: not yet extracted",
+          !is.na(reason) ~ reason, TRUE ~ "Unknown"),
+        `Kode Pupuk (analysis)` = dplyr::coalesce(fert_analysis, `Kode Pupuk`),
+        replicate = ifelse(grepl("-II$", `Nama Sampel`), "II", "I")) |>
+      dplyr::select(`No/Kode Sampel`, `Nama Sampel`, Status, `General reason`, Reason,
+                    `Jenis Kebun`, `Jenis Analisis`, `Kode Kebun`,
+                    `Kode Pupuk (analysis)`, Waktu, replicate,
+                    `Batch Ekstraksi` = batch, date_ekstraksi, `Sample alias`,
+                    seq_batch, `date run`, Reads, Mapped,
+                    `reads after taxonomic filter`) |>
+      dplyr::arrange(suppressWarnings(as.integer(`No/Kode Sampel`)))
+
+    counts <- dplyr::count(sheet, Status)
+    note <- paste0("Generated ", format(Sys.time(), "%Y-%m-%d %H:%M"), " | ",
+                   paste(counts$Status, counts$n, sep = ": ", collapse = " | "),
+                   " | Samples whose Jenis Analisis includes ", m, ".",
+                   " Analysed = in the final processed matrix used by all analyses;",
+                   " General reason = category; Reason = detail of the first",
+                   " pipeline step that removed the sample.")
+    .xl_table(wb, m, sheet, title = paste0(m, ": analysed / not analysed"), note = note)
+    for (k in names(fills)) {
+      rows <- which(sheet$Status == k) + 3
+      if (length(rows))
+        openxlsx::addStyle(wb, m, openxlsx::createStyle(fgFill = fills[[k]]),
+                           rows = rows, cols = 3, stack = TRUE)
+    }
+    openxlsx::addFilter(wb, m, rows = 3, cols = seq_along(sheet))
+  }
   .xl_save(wb, out_path)
 }

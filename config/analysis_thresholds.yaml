@@ -12,6 +12,18 @@ da:
   pseudo_sensitivity: true
   n_cl: 1
   max_taxa_dumbbell: 30
+  # Also compare the first vs last usable timepoint per kebun (e.g. T0 vs T3),
+  # in addition to the consecutive pairs (T0 vs T1, T1 vs T2, T2 vs T3).
+  initial_vs_final: true
+  # Trajectory panel (kebun with >= 3 usable timepoints): LFC vs the first
+  # timepoint for the top-N taxa. The global test (any change across time)
+  # ranks the taxa; it adds run time, set false to rank by the per-timepoint
+  # tests only.
+  max_taxa_trajectory: 20
+  trajectory_global_test: true
+  # Limit to these kebun (testing), e.g. [AMR]. Empty = all kebun. Combine
+  # with `selected:` in analysis_cohorts.yaml to pick the cohort.
+  fields: []
 
 # FAPROTAX is run on 16S species profiles only. Functional groups can overlap,
 # so consecutive timepoints are compared with Wilcoxon tests rather than
@@ -24,6 +36,25 @@ faprotax:
   max_functions_dumbbell: 20
   max_functions_heatmap: 25
   max_functions_trajectory: 8
+  # Clinical / host-associated groups: kept in the CSVs (column
+  # excluded_from_top = TRUE) but never shown in a Top-N; the next function
+  # takes the slot. In soil they mostly reflect species-name artefacts
+  # (e.g. Standard-8 calls of E. coli, Brucella, B. anthracis).
+  exclude_from_top:
+    - human_pathogens_all
+    - human_pathogens_septicemia
+    - human_pathogens_pneumonia
+    - human_pathogens_nosocomia
+    - human_pathogens_meningitis
+    - human_pathogens_gastroenteritis
+    - human_pathogens_diarrhea
+    - human_gut
+    - human_associated
+    - mammal_gut
+    - animal_parasites_or_symbionts
+    - invertebrate_parasites
+    - fish_parasites
+    - intracellular_parasites
   python_bin: python3
 
 cooccurrence:

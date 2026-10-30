@@ -357,6 +357,18 @@ list(
              build_dashboard_xlsx(gold_universe_lookup_16s, gold_universe_lookup_its),
              format = "file"),
 
+  # one-sheet final metadata: every sample, analysed or not + reason
+  tar_target(final_metadata_xlsx,
+             build_final_metadata_xlsx(data_audit, analysis_cohorts,
+                                       gold_universe_lookup_16s,
+                                       gold_universe_lookup_its,
+                                       gold_processed_matrix_16s_species,
+                                       gold_processed_matrix_its_species,
+                                       selected_gold_matrix_16s,
+                                       selected_gold_matrix_its,
+                                       gold_processing_thresholds),
+             format = "file"),
+
   # ===== ANALYSIS OUTPUT ======================================================
   tar_target(analysis_thresholds_file, "config/analysis_thresholds.yaml",
              format = "file"),
@@ -415,8 +427,9 @@ list(
              format = "file"),
 
   # ---- Temporal DA (ANCOM-BC2): per kebun, fertilizers pooled ------------
-  # One model per cohort x kebun x rank; export consecutive pairs only
-  # (T0 vs T1, T1 vs T2, ...), at genus and species levels.
+  # One model per cohort x kebun x rank; export consecutive pairs
+  # (T0 vs T1, T1 vs T2, ...) plus initial vs final (e.g. T0 vs T3), and a
+  # T0 -> final trajectory panel (top-N taxa), at genus and species levels.
   tar_target(gold_temporal_da,
              build_gold_temporal_da(gold_processed_matrix_16s_genus,
                                     gold_processed_matrix_16s_species,

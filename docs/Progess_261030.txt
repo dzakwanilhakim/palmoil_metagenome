@@ -1,0 +1,28 @@
+1) Update Progress Analisis di status kebun - DONE
+2) Dashboard Analisis Metagenome - PROGRESS
+3) fix: for 2 sample PSG and PSN
+4) ANCOM-BC: 
+- feat: pairwise T0 vs Tn, n= final t
+- feat: global panel
+5) FAPROTAX
+- fix: databases
+
+16S 1–4 and 8–13	Standard-8 (whole genomes, mostly clinical)
+ITS 8			Standard-8
+16S 5–7			ncbi_16s_18s 	(16S database)
+ITS others		ncbi_16s_18s_28s_ITS
+
+"For a soil sample, you should absolutely avoid Standard-8. Soil is home to the most hyper-diverse, complex microbial communities on Earth, and an 8 GB database will completely miss the vast majority of the organisms in your sample.
+Your choice between the databases depends entirely on whether you are doing 16S Amplicon sequencing or Shotgun Metagenomics."
+
+Solution:
+Filter out if related to pathogen
+
+-
+
+
+
+
+10) create new project, add Dr popi Dr husna.
+
+
