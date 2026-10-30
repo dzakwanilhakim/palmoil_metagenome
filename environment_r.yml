@@ -8,7 +8,21 @@ dependencies:
   # FAPROTAX collapse_table.py is tested on Python 3.11 and requires NumPy.
   - python=3.11
   - numpy
+  # build tools + -devel libs so renv can compile packages from source
+  - cmake            # nloptr, highs, fs, arrow
+  - pkg-config
   - libxml2
+  - libxml2-devel    # igraph, xml2 (libxml2 alone ships only the runtime .so)
+  - mpfr             # Rmpfr
+  - gmp
+  - freetype         # systemfonts, ragg, textshaping
+  - expat            # expat.pc, required by fontconfig.pc (systemfonts)
+  - harfbuzz
+  - fribidi
+  - libpng
+  - libjpeg-turbo
+  - libtiff
+  - libwebp
   - gsl
   - udunits2
   - glpk

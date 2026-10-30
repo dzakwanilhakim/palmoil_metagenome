@@ -40,9 +40,15 @@ Notes:
 
 - Keep `palmoil` activated when running R: the FAPROTAX step calls `python3`
   (`faprotax.python_bin` in `config/analysis_thresholds.yaml`).
-- If a package fails to compile on a missing library, install it into the env
-  and re-run the restore, e.g.
-  `mamba install -n palmoil -c conda-forge harfbuzz fribidi hdf5`.
+- `renv/settings.json` sets `ppm.enabled: false`, so packages build from
+  source against the conda env's libraries. Posit Package Manager binaries
+  are built for the host OS's system libraries and fail to load under conda
+  R (e.g. `gsl`: `libgsl.so.28: cannot open shared object file`).
+- `environment_r.yml` carries the compilers' build dependencies (cmake,
+  pkg-config, `*-devel` libs). If a package still fails to compile on a
+  missing library, add it there, run
+  `mamba env update -n palmoil -f environment_r.yml`, and re-run the restore
+  (already-built packages come from the renv cache).
 - `renv.lock` was recorded on R 4.5.3; pin `r-base=4.5.3` in
   `environment_r.yml` if renv warns about a version mismatch.
 - `environment_py.yaml` (`palmoil_py`) is only needed for the standalone
