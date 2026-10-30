@@ -36,6 +36,15 @@ faprotax:
   max_functions_dumbbell: 20
   max_functions_heatmap: 25
   max_functions_trajectory: 8
+  # Also compare first vs last usable timepoint per kebun (e.g. T0 vs T3).
+  initial_vs_final: true
+  # One-panel trajectory per kebun (>= 3 usable timepoints): top N functions,
+  # log2 fold change of mean score vs the first timepoint.
+  max_functions_panel: 20
+  # Dumbbells in one kebun folder share one x axis (0 to the largest plotted
+  # mean). sqrt keeps small and large scores readable on that axis; linear =
+  # plain percentage axis.
+  dumbbell_x_scale: sqrt
   # Clinical / host-associated groups: kept in the CSVs (column
   # excluded_from_top = TRUE) but never shown in a Top-N; the next function
   # takes the slot. In soil they mostly reflect species-name artefacts

@@ -412,66 +412,87 @@ plot_temporal_da_dumbbell <- function(result, cutoff, max_taxa,
   list(files = c(all_csv, sig_csv, plot_path), summary = summary)
 }
 
-# One panel, T0 -> final T: LFC vs the first timepoint for the top-N taxa.
-# Filled points = significant vs the first timepoint at that timepoint.
-plot_temporal_da_trajectory <- function(trajectory, cutoff, max_taxa,
-                                        style = load_plot_style(), out_path) {
+# One panel, first -> final timepoint, shared by ANCOM-BC2 and FAPROTAX.
+#   d: one row per feature x timepoint for the selected (top-N) features, with
+#      columns label, waktu, time_order, n, value, significant_vs_ref, and
+#      trajectory_rank. `value` is 0 at the reference (time_order 1).
+#   Lines (one colour per feature) are labelled at the final timepoint; point
+#   fill = timepoint (same palette as everywhere else), large point = BH
+#   significant vs the reference at that timepoint.
+plot_trajectory_panel <- function(d, title, subtitle, y_label, reference, cutoff,
+                                  empty_note, style = load_plot_style(), out_path) {
   dir.create(dirname(out_path), showWarnings = FALSE, recursive = TRUE)
-  first <- trajectory[1, , drop = FALSE]
-  times <- dplyr::distinct(trajectory, time_order, waktu, n) |>
-    dplyr::arrange(time_order)
-  title <- paste0(first$cohort, " — ", first$field, " — ",
-                  stringr::str_to_title(first$rank), " — trajectory ",
-                  first$reference, " to ", first$final)
-  subtitle <- paste0("ANCOM-BC2, all fertilizers pooled within kebun; top ", max_taxa,
-                     " taxa by global test, then vs ", first$reference,
-                     ", then max |LFC|; BH q < ", cutoff) |>
-    stringr::str_wrap(width = 95)
-  d <- dplyr::filter(trajectory, !is.na(trajectory_rank), is.finite(lfc))
-
+  subtitle <- stringr::str_wrap(subtitle, width = 95)
+  d <- dplyr::filter(d, !is.na(trajectory_rank), is.finite(value))
   if (nrow(d) == 0) {
-    p <- .da_placeholder_plot("No taxa significant across time", title, subtitle, style)
-    height <- 5
-  } else {
-    sig_lab <- paste0("q < ", cutoff, " vs ", first$reference)
-    d <- d |>
-      dplyr::mutate(
-        waktu = factor(waktu, levels = times$waktu),
-        taxon = factor(taxon, levels = unique(taxon[order(trajectory_rank)])),
-        point = dplyr::case_when(time_order == 1 ~ "Reference",
-                                 significant_vs_ref ~ sig_lab,
-                                 TRUE ~ "Not significant"))
-    ends <- dplyr::filter(d, time_order == max(time_order))
-    n_tp <- nrow(times)
-    pal <- stats::setNames(grDevices::hcl.colors(nlevels(d$taxon), "Dark 3"),
-                           levels(d$taxon))
-
-    p <- ggplot2::ggplot(d, ggplot2::aes(waktu, lfc, group = taxon, colour = taxon)) +
-      ggplot2::geom_hline(yintercept = 0, linetype = "dashed", colour = "grey55") +
-      ggplot2::geom_line(linewidth = 0.8, alpha = 0.85) +
-      ggplot2::geom_point(ggplot2::aes(shape = point), size = 2.4,
-                          fill = "white", stroke = 0.9) +
-      ggrepel::geom_text_repel(
-        data = ends, ggplot2::aes(label = taxon), size = 3, hjust = 0,
-        direction = "y", nudge_x = 0.2, xlim = c(n_tp + 0.15, NA),
-        min.segment.length = 0, segment.colour = "grey70", show.legend = FALSE) +
-      ggplot2::scale_colour_manual(values = pal, guide = "none") +
-      ggplot2::scale_shape_manual(
-        values = stats::setNames(c(18, 16, 21), c("Reference", sig_lab, "Not significant")),
-        name = NULL) +
-      ggplot2::scale_x_discrete(
-        labels = paste0(times$waktu, "\n(n=", times$n, ")"),
-        expand = ggplot2::expansion(add = c(0.3, 1.2))) +
-      ggplot2::coord_cartesian(clip = "off") +
-      ggplot2::labs(title = title, subtitle = subtitle, x = NULL,
-                    y = paste0("Log fold change vs ", first$reference)) +
-      gold_plot_theme(style) + ggplot2::theme(legend.position = "bottom")
-    height <- max(6, min(12, 0.25 * nlevels(d$taxon) + 4))
+    p <- .da_placeholder_plot(empty_note, title, subtitle, style)
+    ggplot2::ggsave(out_path, p, width = 12, height = 5, dpi = 200)
+    return(out_path)
   }
 
-  ggplot2::ggsave(out_path, p, width = 12, height = height, dpi = 200,
-                  limitsize = FALSE)
+  times <- dplyr::distinct(d, time_order, waktu, n) |> dplyr::arrange(time_order)
+  sig_lab <- paste0("q < ", cutoff, " vs ", reference)
+  d <- d |>
+    dplyr::mutate(
+      waktu = factor(waktu, levels = times$waktu),
+      label = factor(label, levels = unique(label[order(trajectory_rank)])),
+      point = dplyr::case_when(time_order == 1 ~ "Reference",
+                               significant_vs_ref ~ sig_lab,
+                               TRUE ~ "Not significant"))
+  ends <- dplyr::filter(d, time_order == max(time_order))
+  line_pal <- stats::setNames(grDevices::hcl.colors(nlevels(d$label), "Dark 3"),
+                              levels(d$label))
+  time_pal <- waktu_palette()
+  missing_times <- setdiff(levels(d$waktu), names(time_pal))
+  if (length(missing_times))
+    time_pal <- c(time_pal, stats::setNames(
+      grDevices::hcl.colors(length(missing_times), "Dark 3"), missing_times))
+
+  p <- ggplot2::ggplot(d, ggplot2::aes(waktu, value, group = label)) +
+    ggplot2::geom_hline(yintercept = 0, linetype = "dashed", colour = "grey55") +
+    ggplot2::geom_line(ggplot2::aes(colour = label), linewidth = 0.8, alpha = 0.85) +
+    ggplot2::geom_point(ggplot2::aes(fill = waktu, size = point), shape = 21,
+                        colour = "grey20", stroke = 0.6) +
+    ggrepel::geom_text_repel(
+      data = ends, ggplot2::aes(label = label, colour = label), size = 3, hjust = 0,
+      direction = "y", nudge_x = 0.2, xlim = c(nrow(times) + 0.15, NA),
+      min.segment.length = 0, segment.colour = "grey70", show.legend = FALSE) +
+    ggplot2::scale_colour_manual(values = line_pal, guide = "none") +
+    ggplot2::scale_fill_manual(values = time_pal[levels(d$waktu)], name = "Timepoint",
+                               drop = FALSE) +
+    ggplot2::scale_size_manual(
+      values = stats::setNames(c(2.6, 3.8, 1.8), c("Reference", sig_lab, "Not significant")),
+      name = NULL) +
+    ggplot2::guides(fill = ggplot2::guide_legend(override.aes = list(size = 3.5), order = 1),
+                    size = ggplot2::guide_legend(override.aes = list(fill = "grey60"),
+                                                 order = 2)) +
+    ggplot2::scale_x_discrete(
+      labels = paste0(times$waktu, "\n(n=", times$n, ")"),
+      expand = ggplot2::expansion(add = c(0.3, 1.2))) +
+    ggplot2::coord_cartesian(clip = "off") +
+    ggplot2::labs(title = title, subtitle = subtitle, x = NULL, y = y_label) +
+    gold_plot_theme(style) + ggplot2::theme(legend.position = "bottom")
+
+  ggplot2::ggsave(out_path, p, width = 12,
+                  height = max(6, min(12, 0.25 * nlevels(d$label) + 4)),
+                  dpi = 200, limitsize = FALSE)
   out_path
+}
+
+plot_temporal_da_trajectory <- function(trajectory, cutoff, max_taxa,
+                                        style = load_plot_style(), out_path) {
+  first <- trajectory[1, , drop = FALSE]
+  plot_trajectory_panel(
+    dplyr::rename(trajectory, label = taxon, value = lfc),
+    title = paste0(first$cohort, " — ", first$field, " — ",
+                   stringr::str_to_title(first$rank), " — trajectory ",
+                   first$reference, " to ", first$final),
+    subtitle = paste0("ANCOM-BC2, all fertilizers pooled within kebun; top ", max_taxa,
+                      " taxa by global test, then vs ", first$reference,
+                      ", then max |LFC|; BH q < ", cutoff),
+    y_label = paste0("Log fold change vs ", first$reference),
+    reference = first$reference, cutoff = cutoff,
+    empty_note = "No taxa significant across time", style = style, out_path = out_path)
 }
 
 .write_temporal_trajectory <- function(trajectory, cutoff, max_taxa, style, root) {

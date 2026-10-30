@@ -4,10 +4,13 @@
 # FAPROTAX is applicable to prokaryotic 16S profiles, not ITS fungi. Species
 # counts are converted to per-sample functional scores by the bundled
 # collapse_table.py script. Functional groups can overlap, so their scores do
-# not form a mutually exclusive composition. Consecutive timepoints are
-# therefore tested with an unpaired Wilcoxon rank-sum test (BH correction),
-# separately for each cohort and kebun. Fertilizers are pooled analytically:
-# individual samples are retained, but fertilizer is not a grouping variable.
+# not form a mutually exclusive composition. Consecutive timepoints, plus the
+# first vs last usable timepoint (e.g. T0 vs T3), are therefore tested with an
+# unpaired Wilcoxon rank-sum test (BH correction), separately for each cohort
+# and kebun. Kebun with >= 3 usable timepoints also get a one-panel trajectory
+# (top-N functions, Kruskal-Wallis across time). Fertilizers are pooled
+# analytically: individual samples are retained, but fertilizer is not a
+# grouping variable.
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -241,22 +244,54 @@ run_faprotax_annotation <- function(
     dplyr::arrange(q_val, dplyr::desc(abs(delta)), function_name)
 }
 
-plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
-                                   style = load_plot_style(), out_path) {
-  dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
-  first <- result[1, , drop = FALSE]
-  sig <- result |>
+# Rows a dumbbell shows: significant, not excluded, top N by |mean change|.
+.fap_dumbbell_rows <- function(result, max_functions) {
+  result |>
     dplyr::filter(status == "ok", significant, !is.na(function_name),
                   is.finite(mean_earlier), is.finite(mean_later),
                   !(excluded_from_top %in% TRUE)) |>
     dplyr::arrange(dplyr::desc(abs(delta)), q_val) |>
     dplyr::slice_head(n = max_functions)
+}
+
+# Upper x limit shared by every dumbbell of one kebun folder (0 to a rounded
+# max of all plotted means), so the T0_vs_T1, T1_vs_T2, ... plots compare.
+.fap_shared_x_max <- function(results, max_functions) {
+  shown <- dplyr::bind_rows(lapply(results, .fap_dumbbell_rows, max_functions))
+  if (nrow(shown) == 0) return(NULL)
+  max(pretty(c(0, shown$mean_earlier, shown$mean_later)))
+}
+
+# x axis of the dumbbells. "sqrt" keeps small (0.1%) and large (40%) scores
+# readable on one shared axis; "linear" is the plain percentage axis.
+.fap_dumbbell_x_scale <- function(x_max, x_transform) {
+  pct <- function(x) paste0(signif(100 * x, 2), "%")
+  if (x_transform == "sqrt") {
+    steps <- c(0, 0.01, 0.025, 0.05, 0.1, 0.2, 0.3, 0.5, 0.75, 1)
+    top <- x_max %||% 1
+    return(ggplot2::scale_x_continuous(
+      transform = "sqrt", labels = pct, limits = c(0, x_max),
+      breaks = steps[steps <= top]))
+  }
+  ggplot2::scale_x_continuous(
+    labels = pct, limits = if (!is.null(x_max)) c(0, x_max),
+    breaks = if (!is.null(x_max)) pretty(c(0, x_max)) else ggplot2::waiver())
+}
+
+plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
+                                   style = load_plot_style(), out_path,
+                                   x_max = NULL, x_transform = "sqrt") {
+  dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
+  first <- result[1, , drop = FALSE]
+  sig <- .fap_dumbbell_rows(result, max_functions)
 
   title <- paste0(first$cohort, " — ", first$field, " — ", first$contrast)
   subtitle <- stringr::str_wrap(paste0(
     "FAPROTAX functional scores; fertilizers pooled within kebun; BH q < ",
     cutoff, "; top ", max_functions, " by absolute mean change",
-    "; clinical/host-associated groups excluded"), width = 88)
+    "; clinical/host-associated groups excluded",
+    if (!is.null(x_max)) "; x axis shared within kebun" else "",
+    if (x_transform == "sqrt") " (square-root scale)" else ""), width = 80)
 
   if (nrow(sig) == 0) {
     reason <- if (any(result$status == "ok")) {
@@ -299,10 +334,11 @@ plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
                           ggplot2::aes(x = mean_score, y = function_name,
                                        colour = timepoint), size = 3.2) +
       ggplot2::scale_colour_manual(values = time_pal, name = "Timepoint") +
-      ggplot2::scale_x_continuous(labels = function(x) paste0(round(100 * x, 1), "%")) +
+      .fap_dumbbell_x_scale(x_max, x_transform) +
       ggplot2::labs(title = title, subtitle = subtitle,
                     x = "Mean normalized functional score", y = NULL) +
-      gold_plot_theme(style) + ggplot2::theme(legend.position = "bottom")
+      gold_plot_theme(style) +
+      ggplot2::theme(legend.position = "bottom", plot.title.position = "plot")
   }
 
   ggplot2::ggsave(out_path, p, width = 10,
@@ -311,7 +347,8 @@ plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
   out_path
 }
 
-.write_fap_pair <- function(result, cutoff, max_functions, style, root) {
+.write_fap_pair <- function(result, cutoff, max_functions, style, root,
+                            x_max = NULL, x_transform = "sqrt") {
   first <- result[1, , drop = FALSE]
   leaf <- file.path(root, first$cohort, "Functional_FAPROTAX",
                     .fap_safe_path(first$field),
@@ -323,11 +360,12 @@ plot_faprotax_dumbbell <- function(result, cutoff, max_functions,
   plot_path <- file.path(leaf, "dumbbell.png")
   readr::write_csv(result, all_csv)
   readr::write_csv(dplyr::filter(result, status == "ok", significant), sig_csv)
-  plot_faprotax_dumbbell(result, cutoff, max_functions, style, plot_path)
+  plot_faprotax_dumbbell(result, cutoff, max_functions, style, plot_path,
+                         x_max, x_transform)
 
   summary <- first |>
-    dplyr::select(cohort, marker, stage, field, earlier, later, contrast,
-                  n_earlier, n_later) |>
+    dplyr::select(cohort, marker, stage, field, comparison, earlier, later,
+                  contrast, n_earlier, n_later) |>
     dplyr::mutate(
       status = if (any(result$status == "ok")) "ok" else result$status[[1]],
       note = paste(unique(stats::na.omit(result$note)), collapse = "; "),
@@ -427,7 +465,9 @@ plot_faprotax_effect_heatmap <- function(results, max_functions, cutoff,
     dplyr::group_by(cohort, field, earlier, later) |>
     dplyr::summarise(
       pair_status = ifelse(any(status == "ok"), "ok", dplyr::first(status)),
+      pair_type = dplyr::first(comparison),
       .groups = "drop") |>
+    dplyr::arrange(field, pair_type != "consecutive", earlier) |>
     dplyr::mutate(
       pair_id = paste(field, earlier, later, sep = "__"),
       comparison = paste0(field, "\n", earlier, "→", later))
@@ -473,7 +513,7 @@ plot_faprotax_effect_heatmap <- function(results, max_functions, cutoff,
                         " functions by maximum absolute mean change; ",
                         "* BH q < ", cutoff, "; × insufficient data; ",
                         "clinical/host-associated groups excluded"),
-      x = "Kebun and consecutive comparison", y = NULL) +
+      x = "Kebun and comparison (consecutive, then first to last)", y = NULL) +
     gold_plot_theme(style) +
     ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
                    panel.grid = ggplot2::element_blank(),
@@ -556,6 +596,108 @@ plot_faprotax_trajectories <- function(scores, lookup, functions, valid_fields,
   out_path
 }
 
+# Trajectory table for one kebun: every prevalent function x usable timepoint
+# (>= min_samples). value = log2 fold change of the mean score vs the first
+# timepoint; Kruskal-Wallis across all timepoints = global test (BH across
+# functions); Wilcoxon vs the first timepoint per timepoint (BH per timepoint).
+# trajectory_rank marks the top N: global significant first, then significant
+# vs the first timepoint, then max |log2 FC|; excluded groups never ranked.
+.fap_trajectory <- function(scores, meta, stage, field, cutoff, min_samples,
+                            min_prevalence, pseudocount, exclude, max_n) {
+  meta <- dplyr::filter(meta, `Sample alias` %in% names(scores), !is.na(waktu))
+  counts <- table(as.character(meta$waktu))
+  times <- .ordered_timepoints(names(counts)[counts >= min_samples])
+  if (length(times) < 3) return(NULL)
+  meta <- dplyr::filter(meta, waktu %in% times)
+  ids <- meta$`Sample alias`
+  grp <- factor(as.character(meta$waktu), levels = times)
+  ref_i <- grp == times[[1]]
+  functions <- which(!is.na(scores$function_name) & scores$function_name != "unassigned")
+
+  long <- purrr::map_dfr(functions, function(i) {
+    v <- as.numeric(unlist(scores[i, ids, drop = FALSE], use.names = FALSE))
+    if (mean(v > 0, na.rm = TRUE) < min_prevalence) return(NULL)
+    global_p <- if (length(unique(v)) < 2) 1 else
+      tryCatch(stats::kruskal.test(v, grp)$p.value, error = function(e) NA_real_)
+    p_ref <- vapply(times[-1], function(t) {
+      x <- v[ref_i]; y <- v[grp == t]
+      if (length(unique(c(x, y))) < 2) return(1)
+      tryCatch(suppressWarnings(stats::wilcox.test(x, y, exact = FALSE)$p.value),
+               error = function(e) NA_real_)
+    }, numeric(1))
+    means <- as.numeric(tapply(v, grp, mean))
+    tibble::tibble(
+      function_name = as.character(scores$function_name[[i]]),
+      waktu = times, time_order = seq_along(times),
+      n = as.integer(table(grp)), mean_score = means,
+      value = log2((means + pseudocount) / (means[[1]] + pseudocount)),
+      p_vs_ref = c(NA_real_, p_ref), global_p = global_p)
+  })
+  if (nrow(long) == 0) return(NULL)
+
+  global <- dplyr::distinct(long, function_name, global_p) |>
+    dplyr::mutate(global_q = stats::p.adjust(global_p, method = "BH"))
+  long <- long |>
+    dplyr::group_by(waktu) |>
+    dplyr::mutate(q_vs_ref = stats::p.adjust(p_vs_ref, method = "BH")) |>
+    dplyr::ungroup() |>
+    dplyr::left_join(dplyr::select(global, function_name, global_q), by = "function_name") |>
+    dplyr::mutate(significant_vs_ref = !is.na(q_vs_ref) & q_vs_ref < cutoff,
+                  global_significant = !is.na(global_q) & global_q < cutoff,
+                  excluded_from_top = function_name %in% exclude)
+
+  ranking <- long |>
+    dplyr::filter(!excluded_from_top) |>
+    dplyr::group_by(function_name) |>
+    dplyr::summarise(global_sig = any(global_significant),
+                     any_sig = any(significant_vs_ref),
+                     max_abs = max(abs(value), na.rm = TRUE), .groups = "drop") |>
+    dplyr::filter(global_sig | any_sig) |>
+    dplyr::arrange(dplyr::desc(global_sig), dplyr::desc(max_abs)) |>
+    dplyr::slice_head(n = max_n) |>
+    dplyr::mutate(trajectory_rank = dplyr::row_number(),
+                  selected_by = ifelse(global_sig, "global test", paste0("vs ", times[[1]])))
+
+  long |>
+    dplyr::left_join(dplyr::select(ranking, function_name, selected_by, trajectory_rank),
+                     by = "function_name") |>
+    dplyr::mutate(cohort = paste0("16S_", stage), stage = stage, field = field,
+                  reference = times[[1]], final = times[[length(times)]], .before = 1) |>
+    dplyr::rename(log2_fc_vs_ref = value) |>
+    dplyr::arrange(trajectory_rank, function_name, time_order)
+}
+
+.write_fap_trajectory <- function(trajectory, cutoff, max_n, style, field_dir) {
+  first <- trajectory[1, , drop = FALSE]
+  csv <- file.path(field_dir, "faprotax_trajectory_panel.csv")
+  png <- file.path(field_dir, "faprotax_trajectory_panel.png")
+  readr::write_csv(trajectory, csv)
+  plot_trajectory_panel(
+    dplyr::rename(trajectory, label = function_name, value = log2_fc_vs_ref) |>
+      dplyr::mutate(label = stringr::str_replace_all(label, "_", " ")),
+    title = paste0(first$cohort, " — ", first$field, " — FAPROTAX trajectory ",
+                   first$reference, " to ", first$final),
+    subtitle = paste0("Mean functional score, fertilizers pooled within kebun; top ", max_n,
+                      " functions by Kruskal-Wallis across time, then Wilcoxon vs ",
+                      first$reference, ", then max |log2 FC|; BH q < ", cutoff,
+                      "; clinical/host-associated groups excluded"),
+    y_label = paste0("log2 fold change of mean score vs ", first$reference),
+    reference = first$reference, cutoff = cutoff,
+    empty_note = "No functions significant across time", style = style, out_path = png)
+
+  per_fn <- dplyr::distinct(trajectory, function_name, global_significant, trajectory_rank)
+  times <- dplyr::distinct(trajectory, time_order, waktu, n) |> dplyr::arrange(time_order)
+  summary <- first |>
+    dplyr::select(cohort, stage, field, reference, final) |>
+    dplyr::mutate(
+      timepoints = paste0(times$waktu, " (n=", times$n, ")", collapse = ", "),
+      functions_tested = nrow(per_fn),
+      global_significant = sum(per_fn$global_significant),
+      functions_plotted = sum(!is.na(per_fn$trajectory_rank)),
+      trajectory_csv = csv, trajectory_plot = png)
+  list(files = c(csv, png), summary = summary)
+}
+
 plot_faprotax_coverage <- function(coverage, style = load_plot_style(), out_path) {
   dir.create(dirname(out_path), recursive = TRUE, showWarnings = FALSE)
   if (nrow(coverage) == 0) {
@@ -605,6 +747,9 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
   max_heatmap <- as.integer(.fap_cfg(cfg$max_functions_heatmap, 25L))
   max_trajectory <- as.integer(.fap_cfg(cfg$max_functions_trajectory, 8L))
   exclude_top <- as.character(unlist(cfg$exclude_from_top %||% character()))
+  initial_vs_final <- as.logical(.fap_cfg(cfg$initial_vs_final, TRUE))
+  max_panel <- as.integer(.fap_cfg(cfg$max_functions_panel, 20L))
+  x_transform <- as.character(.fap_cfg(cfg$dumbbell_x_scale, "sqrt"))
 
   if (!is.finite(cutoff) || cutoff <= 0 || cutoff >= 1)
     stop("FAPROTAX: adj_pval_cutoff must be between 0 and 1.", call. = FALSE)
@@ -620,12 +765,19 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
     stop("FAPROTAX: max_functions_heatmap must be >= 1.", call. = FALSE)
   if (is.na(max_trajectory) || max_trajectory < 1)
     stop("FAPROTAX: max_functions_trajectory must be >= 1.", call. = FALSE)
+  if (is.na(initial_vs_final))
+    stop("FAPROTAX: initial_vs_final must be true or false.", call. = FALSE)
+  if (!x_transform %in% c("sqrt", "linear"))
+    stop("FAPROTAX: dumbbell_x_scale must be sqrt or linear.", call. = FALSE)
+  if (is.na(max_panel) || max_panel < 1)
+    stop("FAPROTAX: max_functions_panel must be >= 1.", call. = FALSE)
 
   message("FAPROTAX temporal settings: BH cutoff=", cutoff,
           ", min samples/timepoint=", min_samples,
           ", prevalence=", min_prevalence,
           ", top functions/plot=", max_functions,
           ", heatmap=", max_heatmap, ", trajectories=", max_trajectory,
+          ", trajectory panel=", max_panel, ", initial vs final=", initial_vs_final,
           "; fertilizers pooled; excluded from Top-N: ",
           if (length(exclude_top)) paste(exclude_top, collapse = ", ") else "none")
 
@@ -653,15 +805,26 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
       definition <- definitions[field_i, , drop = FALSE]
       fld <- definition$field[[1]]
       field_meta <- analysis_field_subset(stage_meta, definition)
-      for (pair_i in seq_len(nrow(pairs))) {
-        earlier <- pairs$earlier[[pair_i]]
-        later <- pairs$later[[pair_i]]
-        result <- .fap_test_pair(
-          scores, field_meta, st, fld, earlier, later, cutoff, min_samples,
+      field_pairs <- dplyr::mutate(pairs, comparison = "consecutive")
+      if (initial_vs_final) {
+        counts <- table(as.character(
+          field_meta$waktu[field_meta$`Sample alias` %in% names(scores)]))
+        field_pairs <- dplyr::bind_rows(
+          field_pairs, .initial_final_pair(counts, min_samples, field_pairs))
+      }
+      field_results <- lapply(seq_len(nrow(field_pairs)), function(pair_i) {
+        .fap_test_pair(
+          scores, field_meta, st, fld, field_pairs$earlier[[pair_i]],
+          field_pairs$later[[pair_i]], cutoff, min_samples,
           min_prevalence, pseudocount) |>
           # clinical/host groups stay in the CSVs but never take a Top-N slot
-          dplyr::mutate(excluded_from_top = function_name %in% exclude_top)
-        output <- .write_fap_pair(result, cutoff, max_functions, style, root)
+          dplyr::mutate(comparison = field_pairs$comparison[[pair_i]],
+                        excluded_from_top = function_name %in% exclude_top)
+      })
+      x_max <- .fap_shared_x_max(field_results, max_functions)
+      for (result in field_results) {
+        output <- .write_fap_pair(result, cutoff, max_functions, style, root,
+                                  x_max, x_transform)
         idx <- idx + 1L
         written <- c(written, output$files)
         summaries[[idx]] <- output$summary
@@ -675,8 +838,8 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
   if (nrow(summary_tbl) == 0) {
     summary_tbl <- tibble::tibble(
       cohort = character(), marker = character(), stage = character(),
-      field = character(), earlier = character(), later = character(),
-      contrast = character(), n_earlier = integer(), n_later = integer(),
+      field = character(), comparison = character(), earlier = character(),
+      later = character(), contrast = character(), n_earlier = integer(), n_later = integer(),
       status = character(), note = character(), functions_tested = integer(),
       significant_functions = integer(), all_functions_csv = character(),
       significant_csv = character(), dumbbell_plot = character())
@@ -686,6 +849,7 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
   written <- c(written, summary_path)
 
   # Cohort-level overview figures consolidate all kebun and transitions.
+  panel_summaries <- list()
   for (st in stages) {
     cohort <- paste0("16S_", st)
     cohort_results <- dplyr::filter(results_tbl, stage == st)
@@ -743,11 +907,24 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
           dplyr::filter(coverage, stage == st), definition),
         style, field_coverage)
       written <- c(written, field_heatmap, field_trajectory, field_coverage)
+
+      panel <- .fap_trajectory(
+        scores, analysis_field_subset(dplyr::filter(lookup_16s, stage == st), definition),
+        st, fld, cutoff, min_samples, min_prevalence, pseudocount, exclude_top, max_panel)
+      if (!is.null(panel)) {
+        out <- .write_fap_trajectory(panel, cutoff, max_panel, style, field_dir)
+        written <- c(written, out$files)
+        panel_summaries[[length(panel_summaries) + 1L]] <- out$summary
+      }
     }
   }
 
+  panel_tbl <- dplyr::bind_rows(panel_summaries)
+  panel_path <- file.path(analysis_dir, "faprotax_trajectory_summary.csv")
+  readr::write_csv(panel_tbl, panel_path)
+  written <- c(written, panel_path)
   message("FAPROTAX temporal analysis complete: ", nrow(summary_tbl),
-          " kebun/time comparisons.")
+          " kebun/time comparisons, ", nrow(panel_tbl), " trajectory panels.")
   list(files = unique(written), summary = summary_tbl,
        summary_csv = summary_path, coverage_csv = coverage_path)
 }
