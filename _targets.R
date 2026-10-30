@@ -250,6 +250,8 @@ list(
              "config/analysis_cohorts.yaml", format = "file"),
   tar_target(analysis_cohorts,
              load_analysis_cohorts(analysis_cohorts_file)),
+  tar_target(analysis_fields,
+             load_analysis_fields(analysis_cohorts_file)),
   tar_target(combined_kebun,
              load_combined_kebun(analysis_cohorts_file, analysis_cohorts)),
   tar_target(analysis_cohorts_csv,
@@ -257,9 +259,11 @@ list(
              format = "file"),
 
   tar_target(selected_gold_qc_16s,
-             subset_gold_qc_cohorts(gold_qc_16s, "16S", analysis_cohorts)),
+             subset_gold_qc_cohorts(gold_qc_16s, "16S", analysis_cohorts,
+                                    analysis_fields)),
   tar_target(selected_gold_qc_its,
-             subset_gold_qc_cohorts(gold_qc_its, "ITS", analysis_cohorts)),
+             subset_gold_qc_cohorts(gold_qc_its, "ITS", analysis_cohorts,
+                                    analysis_fields)),
 
   tar_target(selected_gold_matrix_16s,
              purrr::map(gold_matrix_16s, gold_matrix_high_pass,
@@ -326,6 +330,13 @@ list(
   # ===== DASHBOARD ============================================================
   tar_target(plot_style_file, "config/plot_style.yaml", format = "file"),
   tar_target(plot_style, load_plot_style(plot_style_file)),
+
+  # Shared figure keys (treatment codes, biofertilizer contents, timepoint
+  # colours) + a caption per image type -> Results/legends/
+  tar_target(supplementary_file, "docs/supplementary.md", format = "file"),
+  tar_target(legend_files,
+             build_legend_folder(supplementary_file, plot_style),
+             format = "file"),
 
   tar_target(dashboard_qc_status_pie,
              build_qc_status_pie(selected_gold_qc_16s, selected_gold_qc_its,

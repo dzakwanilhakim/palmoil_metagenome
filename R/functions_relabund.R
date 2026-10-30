@@ -216,6 +216,19 @@ mean_relabund <- function(long, gp_map, marker, rank, group_cols,
 }
 
 # stacked bar: x=fertilizer, facet=timepoint, fill=taxon
+# Up to ~55 visually distinct colours for many-taxon stacked bars: the
+# "Polychrome 36" and "Alphabet" palettes (designed for many categories),
+# minus near-grey shades that would blend with Other / Unknown. Beyond that,
+# hue-wheel colours fill the rest.
+distinct_taxon_colours <- function(n) {
+  base <- unique(c(grDevices::palette.colors(36, "Polychrome 36"),
+                   grDevices::palette.colors(26, "Alphabet")))
+  rgb <- grDevices::col2rgb(base)
+  base <- unname(base[apply(rgb, 2, function(x) max(x) - min(x)) > 45])
+  if (n <= length(base)) return(base[seq_len(n)])
+  c(base, scales::hue_pal()(n - length(base)))
+}
+
 plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
                              style = NULL) {
   if (nrow(plot_df) == 0) return(NA_character_)
@@ -235,7 +248,7 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
   plot_df$taxon <- factor(plot_df$taxon, levels = legend_levels)
 
   n_tax <- length(legend_levels)
-  pal <- setNames(scales::hue_pal()(length(real)), real)
+  pal <- setNames(distinct_taxon_colours(length(real)), real)
   bottom_pal <- c(Other = "grey75", Unknown = "grey45")
   pal <- c(pal, bottom_pal[bottom])
 
@@ -263,8 +276,16 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
                    plot.title = ggplot2::element_text(face = "bold"),
                    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
                    legend.text = ggplot2::element_text(size = 8))
+  # long legends (e.g. Top-50): smaller keys, 25 entries per column, taller
+  # and wider figure
+  legend_cols <- ceiling(n_tax / 25)
+  if (n_tax > 20)
+    p <- p + ggplot2::guides(fill = ggplot2::guide_legend(ncol = legend_cols)) +
+      ggplot2::theme(legend.key.size = ggplot2::unit(0.38, "cm"))
   n_tp <- dplyr::n_distinct(plot_df$timepoint)
-  ggplot2::ggsave(out_path, p, width = max(7, 2.6 * n_tp), height = 6, dpi = 200,
+  ggplot2::ggsave(out_path, p,
+                  width = max(7, 2.6 * n_tp) + 2.4 * (legend_cols - 1),
+                  height = if (n_tax > 20) 8 else 6, dpi = 200,
                   limitsize = FALSE)
   out_path
 }

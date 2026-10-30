@@ -46,6 +46,17 @@ load_analysis_cohorts <- function(path = "config/analysis_cohorts.yaml") {
   validate_analysis_cohorts(cfg$selected)
 }
 
+# Optional kebun filter (Kode Kebun) applied at the same gate, e.g. [AMR] for
+# a quick end-to-end test. Empty = all kebun.
+load_analysis_fields <- function(path = "config/analysis_cohorts.yaml") {
+  fields <- trimws(as.character(unlist(yaml::read_yaml(path)$fields,
+                                       use.names = FALSE)))
+  fields <- fields[nzchar(fields)]
+  if (length(fields))
+    message("Downstream analysis limited to kebun: ", paste(fields, collapse = ", "))
+  fields
+}
+
 # Parse optional, overlapping virtual kebun definitions. One row represents
 # one virtual group in one marker-stage cohort; `members` is a list-column of
 # original Kode Kebun values. Groups not belonging to a selected cohort are
@@ -203,13 +214,16 @@ write_analysis_cohorts <- function(selected_cohorts, combined_kebun = NULL,
 # Restrict one marker's gold-QC table by marker x stage cohort. Rows with no
 # resolved stage cannot belong to an analysis cohort and are excluded here;
 # they remain present in the complete gold_qc CSV and recommendation table.
-subset_gold_qc_cohorts <- function(gold_qc, marker, selected_cohorts) {
+subset_gold_qc_cohorts <- function(gold_qc, marker, selected_cohorts,
+                                   fields = character()) {
   if (!marker %in% c("16S", "ITS"))
     stop("subset_gold_qc_cohorts: marker must be '16S' or 'ITS'.", call. = FALSE)
 
   cohort <- paste(marker, gold_qc[["Jenis Kebun"]], sep = "_")
-  out <- gold_qc[!is.na(gold_qc[["Jenis Kebun"]]) &
-                   cohort %in% selected_cohorts, , drop = FALSE]
+  keep <- !is.na(gold_qc[["Jenis Kebun"]]) & cohort %in% selected_cohorts
+  if (length(fields))
+    keep <- keep & gold_qc[["Kode Kebun"]] %in% fields
+  out <- gold_qc[keep, , drop = FALSE]
   message("subset_gold_qc_cohorts [", marker, "]: kept ", nrow(out), "/",
           nrow(gold_qc), " QC row(s).")
   out

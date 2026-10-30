@@ -10,7 +10,7 @@ da:
   # Recommended by ANCOM-BC2 to reduce false positives. Set false only for a
   # faster development smoke test; do not use that shortcut for final results.
   pseudo_sensitivity: true
-  n_cl: 1
+  n_cl: 8   # ANCOM-BC2 parallel workers; machine has 8 cores
   max_taxa_dumbbell: 30
   # Also compare the first vs last usable timepoint per kebun (e.g. T0 vs T3),
   # in addition to the consecutive pairs (T0 vs T1, T1 vs T2, T2 vs T3).

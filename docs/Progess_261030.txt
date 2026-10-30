@@ -16,11 +16,16 @@ ITS others		ncbi_16s_18s_28s_ITS
 Your choice between the databases depends entirely on whether you are doing 16S Amplicon sequencing or Shotgun Metagenomics."
 
 Solution:
-Filter out if related to pathogen
+Filter out if related to clinical/pathogen
 
--
+- Fix: same X scale, add legend
+- Feature: global panel 
+- Feature: pairwise T0 vs Tn, n= final t
 
 
+6) Stack bar chart
+- Fix: For top n genus, retrieve only from top n phylum,
+- Fix: For top n species, retrieve only from top n genus
 
 
 10) create new project, add Dr popi Dr husna.

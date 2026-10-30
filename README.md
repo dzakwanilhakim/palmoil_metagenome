@@ -159,6 +159,10 @@ Results/
 │   ├── low_pass_hypothesis.xlsx   LOW PASS samples + rule-based hypotheses
 │   ├── data_report.xlsx           overview, QC per cohort, batches, coverage
 │   └── dashboard_summary.xlsx, *.png   QC/diversity dashboard
+├── legends/                       shared figure keys, built from
+│                                  docs/supplementary.md: treatment_TM.png,
+│                                  treatment_Nursery.png, biofertilizer_contents.png,
+│                                  timepoint_colours.png, figure_legends.md
 ├── data_counts/<universe>/<field>_counts.png   replicate inventory tables
 └── <universe>/
     ├── Goal_A_Intra_Snapshot/<field>/      alpha boxplots + sliced stats
