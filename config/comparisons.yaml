@@ -84,5 +84,5 @@ beta_metrics:
 relabund:
   source: rarefied          # compute proportions FROM rarefied table
   ranks: [phylum, genus]
-  top_n: 10                 # Top 10 each; rest -> "Other"
+  top_n: 50                 # Top 50 independently at each rank; rest -> "Other"
   exclude_unclassified: true  # from PLOTS (full CSV keeps everything)

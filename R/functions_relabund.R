@@ -3,7 +3,7 @@
 #   Source: rarefied genus table. Phylum = agglomerated from genus via lineage.
 #   Strict taxonomy already applied upstream; restricted to master samples.
 #   Plots: x=fertilizer, facet=timepoint, MEAN relative abundance per group,
-#          Top-10 taxa + "Other", "Unclassified" EXCLUDED from plots.
+#          Top-50 taxa + "Other", "Unclassified" EXCLUDED from plots.
 #   CSVs : full un-truncated mean relative abundance per rank.
 #   Goal B: per field (subset). Goal D: pooled all fields. Both same layout.
 # =============================================================================
@@ -94,21 +94,10 @@ load_species_long <- function(species_files, metadata_all, master_samples,
 }
 
 # ---- SPECIES stacked bar for one subset --------------------------------------
-# 1) find Top-N genera in THIS subset (by mean rel abundance, genus level)
-# 2) keep only species whose parent genus is in that Top-N
-# 3) Top-N species + "Other"; mean rel abundance per (fertilizer, timepoint)
-species_bar_df <- function(sp_long, genus_long, gp_map, marker, top_n = 15) {
-  # Top-N genera for this subset (reuse the genus mean-relabund Top-N logic)
-  g_top <- mean_relabund(genus_long, gp_map, marker, "genus",
-                         group_cols = c("fertilizer","timepoint"),
-                         top_n = top_n, exclude_unclassified = TRUE, full = FALSE)
-  top_genera <- setdiff(unique(g_top$taxon), "Other")
-
-  # keep species within the Top-N genera
-  d <- dplyr::filter(sp_long, genus %in% top_genera)
-  message("  species_bar_df: ", length(top_genera), " top genera, ",
-          dplyr::n_distinct(d$species), " species matched (",
-          nrow(d), " rows)")
+# Select Top-N species directly from all species in this subset, independently
+# of the genus/phylum selections; mean abundance per (fertilizer, timepoint).
+species_bar_df <- function(sp_long, top_n = 50L) {
+  d <- sp_long
   d$taxon <- d$species
   d$taxon[is.na(d$taxon) | d$taxon == ""] <- "Unclassified"
 
@@ -118,7 +107,7 @@ species_bar_df <- function(sp_long, genus_long, gp_map, marker, top_n = 15) {
     dplyr::group_by(fertilizer, timepoint, id_sampel, taxon) |>
     dplyr::summarise(count = sum(count, na.rm = TRUE), .groups = "drop")
 
-  # per-sample proportion within the Top-genera species set (sums to 100%)
+  # per-sample proportion across the complete species set (sums to 100%)
   per_sample <- per_ss |>
     dplyr::group_by(fertilizer, timepoint, id_sampel) |>
     dplyr::mutate(samp_total = sum(count),
@@ -171,7 +160,7 @@ rarefied_long <- function(norm_tables, master_samples, marker) {
 # group_cols defines the bar groups (fertilizer, timepoint [, field])
 # returns tidy: group_cols..., taxon, mean_rel (0-1). full = no Top-N truncation.
 mean_relabund <- function(long, gp_map, marker, rank, group_cols,
-                          top_n = 10, exclude_unclassified = TRUE,
+                          top_n = 50L, exclude_unclassified = TRUE,
                           full = FALSE) {
   d <- long
   if (rank == "phylum") {
@@ -294,7 +283,7 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
 # MAIN: relabund bars into the tree (Goal B per field, Goal D pooled)
 # ============================================================================
 build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
-                                 root = "Results", top_ns = c(10, 15)) {
+                                 root = "Results", top_ns = 50L) {
   gp_map    <- build_genus_phylum_map(thresholded_long)
   universes <- master_samples |> dplyr::distinct(marker, stage) |>
     dplyr::filter(!is.na(stage)) |> dplyr::arrange(marker, stage)
@@ -363,16 +352,14 @@ build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
 }
 
 # ============================================================================
-# SPECIES stacked bars (Goal B per field, Goal D pooled) — Top-15 only
-#   Top-15 genera computed per-plot; species filtered to those genera; then
-#   Top-15 species + "Other". Same samples as genus QC (master list).
+# SPECIES stacked bars (Goal B per field, Goal D pooled) — Top-50 species
+#   selected independently. Same samples as genus QC (master list).
 # ============================================================================
 build_species_tree <- function(thresholded_long, norm_tables, master_samples,
-                                species_long, root = "Results", top_n = 15) {
+                                species_long, root = "Results", top_n = 50L) {
   if (nrow(species_long) == 0) {
     message("No species data ingested; skipping species bars."); return(character(0))
   }
-  gp_map <- build_genus_phylum_map(thresholded_long)
   universes <- master_samples |> dplyr::distinct(marker, stage) |>
     dplyr::filter(!is.na(stage)) |> dplyr::arrange(marker, stage)
   written <- character(0)
@@ -392,15 +379,13 @@ build_species_tree <- function(thresholded_long, norm_tables, master_samples,
 
     ## Goal B — per field
     for (fld in fields) {
-      gl <- dplyr::filter(g_long, field == fld)
       sl <- dplyr::filter(sp_u,  field == fld)
       if (nrow(sl) == 0) next
       leaf <- file.path(udir, "Goal_B_Intra_Longitudinal", fld)
       dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
-      df <- species_bar_df(sl, gl, gp_map, mk, top_n)
+      df <- species_bar_df(sl, top_n = top_n)
       w <- plot_stacked_bar(df, "species",
-            title = paste0(ucode," — Goal B — ",fld," — species (Top ",top_n,
-                           ", within Top ",top_n," genera)"),
+            title = paste0(ucode," — Goal B — ",fld," — species (Top ",top_n,")"),
             out_path = file.path(leaf, paste0("stackbar_species_top",top_n,"_",fld,".png")),
             all_ferts = all_ferts)
       if (!is.na(w)) written <- c(written, w)
@@ -411,10 +396,9 @@ build_species_tree <- function(thresholded_long, norm_tables, master_samples,
     ## Goal D — pooled
     leafD <- file.path(udir, "Goal_D_Cross_Longitudinal")
     dir.create(leafD, recursive = TRUE, showWarnings = FALSE)
-    dfD <- species_bar_df(sp_u, g_long, gp_map, mk, top_n)
+    dfD <- species_bar_df(sp_u, top_n = top_n)
     wD <- plot_stacked_bar(dfD, "species",
-           title = paste0(ucode," — Goal D (pooled) — species (Top ",top_n,
-                          ", within Top ",top_n," genera)"),
+           title = paste0(ucode," — Goal D (pooled) — species (Top ",top_n,")"),
            out_path = file.path(leafD, paste0("stackbar_species_top",top_n,"_pooled.png")),
            all_ferts = all_ferts)
     if (!is.na(wD)) written <- c(written, wD)

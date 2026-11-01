@@ -125,7 +125,7 @@ FIGURE_LEGENDS <- list(
     "`alpha_traj_*.png` - Alpha diversity per treatment across timepoints.",
     "`beta_ord_*.png` - Ordination of beta diversity (Aitchison, Bray-Curtis or Jaccard as named in the file); colours = timepoint; PERMANOVA in the CSVs.",
     "`beta_dendro_*.png` - Ward.D2 hierarchical clustering of samples on the same distance.",
-    "`stackbar_{rank}_topN_{kebun}.png` - Mean relative abundance per treatment (x) and timepoint (panels) from the rarefied species table. Top N taxa are named; genus is chosen only from the top phyla and species only from the top genera; the remaining taxa are summed as Other (light grey); Unknown (dark grey) = unresolved name."),
+    "`stackbar_{rank}_topN_{kebun}.png` - Mean relative abundance per treatment (x) and timepoint (panels) from the rarefied species table. The top 50 taxa are selected independently at each rank (phylum, genus, species), ranked by summed group mean relative abundance; the remaining taxa are summed as Other (light grey); Unknown (dark grey) = unresolved name."),
   "Goal C - all kebun, one timepoint (`Goal_C_Cross_Snapshot`)" = c(
     "`alpha_box_crossfield_*.png` - Alpha diversity per treatment at one timepoint with all kebun pooled."),
   "Goal D - all kebun over time (`Goal_D_Cross_Longitudinal`)" = c(

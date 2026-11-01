@@ -81,41 +81,25 @@ gold_rarefied_species_long <- function(rarefied_universe, processed_species,
     dplyr::summarise(mean_rel = mean(rel), .groups = "drop")
 }
 
-# Top-N taxa at `rank` by summed group mean. With parent_rank/parents, only
-# taxa whose parent is in `parents` compete (genus from the Top-N phyla,
-# species from the Top-N genera), so the three charts nest.
+# Top-N taxa at `rank` by summed group mean, independently of other ranks.
 # Top-N among CLASSIFIED taxa only -- Unknown never competes for a slot,
 # it's always its own bucket. with_ties=FALSE: many taxa can tie at
 # mean_rel=0 for a small subset, and slice_max()'s default with_ties=TRUE
 # would return ALL of them, blowing the Top-N cap open.
-top_taxa_gold <- function(long, rank, n, parent_rank = NULL, parents = NULL) {
+top_taxa_gold <- function(long, rank, n = 50L) {
   cand <- dplyr::filter(.relabund_group_means(long, rank), taxon != "Unknown")
-  if (!is.null(parent_rank)) {
-    in_parents <- long[[rank]][long[[parent_rank]] %in% parents]
-    cand <- dplyr::filter(cand, taxon %in% in_parents)
-  }
   cand |> dplyr::group_by(taxon) |>
     dplyr::summarise(tot = sum(mean_rel), .groups = "drop") |>
     dplyr::slice_max(tot, n = n, with_ties = FALSE) |> dplyr::pull(taxon)
 }
 
-# Hierarchical Top-N: phylum, then genus within those phyla, then species
-# within those genera.
-hierarchical_top_taxa <- function(long, n) {
-  phylum <- top_taxa_gold(long, "phylum", n)
-  genus <- top_taxa_gold(long, "genus", n, "phylum", phylum)
-  list(phylum = phylum, genus = genus,
-       species = top_taxa_gold(long, "species", n, "genus", genus))
-}
-
 # mean relative abundance at a given rank (species/genus/phylum), Top-N +
 # Other. Mirrors the established mean_relabund()'s per-sample-then-mean
-# logic. `top_taxa` overrides the plain Top-N (see hierarchical_top_taxa()).
-mean_relabund_gold <- function(long, rank, top_n = 10, full = FALSE,
-                               top_taxa = NULL) {
+# logic. Each rank selects its own most abundant taxa.
+mean_relabund_gold <- function(long, rank, top_n = 50L, full = FALSE) {
   grp_mean <- .relabund_group_means(long, rank)
   if (full) return(grp_mean)   # un-truncated, keeps Unknown -> for CSV
-  if (is.null(top_taxa)) top_taxa <- top_taxa_gold(long, rank, top_n)
+  top_taxa <- top_taxa_gold(long, rank, top_n)
 
   bucketed <- grp_mean |>
     dplyr::mutate(taxon = dplyr::case_when(
@@ -142,8 +126,7 @@ mean_relabund_gold <- function(long, rank, top_n = 10, full = FALSE,
 # ============================================================================
 # MAIN: Goal B (per field) + Goal D (pooled), ranks = phylum/genus/species
 #   Top-N for all three ranks from plot_style.yaml `stackbar_top_n`
-#   (default 50). Top-N is hierarchical: genus only from the Top-N phyla,
-#   species only from the Top-N genera (same N).
+#   (default 50). Each rank selects its Top-N independently.
 # ============================================================================
 build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lookup_16s,
                                      gold_processed_matrix_16s_species,
@@ -170,8 +153,6 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
               " original/combined fields) ===")
 
       for (rank in c("phylum", "genus", "species")) {
-        top_n_this_rank <- top_ns
-
         ## Goal B — per field
         for (i in seq_len(nrow(definitions))) {
           definition <- definitions[i, , drop = FALSE]
@@ -181,9 +162,8 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
           leaf <- file.path(udir, "Goal_B_Intra_Longitudinal", fld)
           dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
 
-          for (tn in top_n_this_rank) {
-            plt <- mean_relabund_gold(lf, rank, top_n = tn,
-                                      top_taxa = hierarchical_top_taxa(lf, tn)[[rank]])
+          for (tn in top_ns) {
+            plt <- mean_relabund_gold(lf, rank, top_n = tn)
             w <- plot_stacked_bar(plt, rank,
                    title = paste0(ucode, " — Goal B — ", fld, " — ", rank,
                                   " (Top ", tn, ")"),
@@ -200,9 +180,8 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
         ## Goal D — pooled all fields
         leafD <- file.path(udir, "Goal_D_Cross_Longitudinal")
         dir.create(leafD, recursive = TRUE, showWarnings = FALSE)
-        for (tn in top_n_this_rank) {
-          pltD <- mean_relabund_gold(long, rank, top_n = tn,
-                                     top_taxa = hierarchical_top_taxa(long, tn)[[rank]])
+        for (tn in top_ns) {
+          pltD <- mean_relabund_gold(long, rank, top_n = tn)
           wD <- plot_stacked_bar(pltD, rank,
                  title = paste0(ucode, " — Goal D (pooled) — ", rank,
                                 " (Top ", tn, ")"),

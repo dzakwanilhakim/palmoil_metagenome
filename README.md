@@ -126,7 +126,8 @@ Results/       generated outputs (see below)
      n>=2 gate, BH-adjusted.
    - Beta (Aitchison/Bray-Curtis/Jaccard): ordinations, Ward.D2 dendrograms,
      PERMANOVA. Generated for Goals B and D.
-   - Relative abundance: Top-10 / Top-15 stacked bars (phylum + genus) +
+   - Relative abundance: Top-50 stacked bars selected independently for
+     phylum, genus, and species, with remaining taxa grouped as Other, plus
      full CSVs.
    - Temporal differential abundance: ANCOM-BC2 at genus and species levels,
      one model per cohort and kebun with fertilizers pooled; exports only
