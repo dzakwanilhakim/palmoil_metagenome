@@ -86,7 +86,7 @@ gold_rarefied_species_long <- function(rarefied_universe, processed_species,
 # it's always its own bucket. with_ties=FALSE: many taxa can tie at
 # mean_rel=0 for a small subset, and slice_max()'s default with_ties=TRUE
 # would return ALL of them, blowing the Top-N cap open.
-top_taxa_gold <- function(long, rank, n = 50L) {
+top_taxa_gold <- function(long, rank, n = 100L) {
   cand <- dplyr::filter(.relabund_group_means(long, rank), taxon != "Unknown")
   cand |> dplyr::group_by(taxon) |>
     dplyr::summarise(tot = sum(mean_rel), .groups = "drop") |>
@@ -96,7 +96,7 @@ top_taxa_gold <- function(long, rank, n = 50L) {
 # mean relative abundance at a given rank (species/genus/phylum), Top-N +
 # Other. Mirrors the established mean_relabund()'s per-sample-then-mean
 # logic. Each rank selects its own most abundant taxa.
-mean_relabund_gold <- function(long, rank, top_n = 50L, full = FALSE) {
+mean_relabund_gold <- function(long, rank, top_n = 100L, full = FALSE) {
   grp_mean <- .relabund_group_means(long, rank)
   if (full) return(grp_mean)   # un-truncated, keeps Unknown -> for CSV
   top_taxa <- top_taxa_gold(long, rank, top_n)
@@ -126,7 +126,7 @@ mean_relabund_gold <- function(long, rank, top_n = 50L, full = FALSE) {
 # ============================================================================
 # MAIN: Goal B (per field) + Goal D (pooled), ranks = phylum/genus/species
 #   Top-N for all three ranks from plot_style.yaml `stackbar_top_n`
-#   (default 50). Each rank selects its Top-N independently.
+#   (default 100). Each rank selects its Top-N independently.
 # ============================================================================
 build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lookup_16s,
                                      gold_processed_matrix_16s_species,
@@ -134,7 +134,7 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
                                      gold_processed_matrix_its_species,
                                      style = load_plot_style(), root = "Results",
                                      top_ns = NULL, combined_kebun = NULL) {
-  top_ns <- as.integer(unlist(top_ns %||% style$stackbar_top_n %||% 50L))
+  top_ns <- as.integer(unlist(top_ns %||% style$stackbar_top_n %||% 100L))
   written <- character(0)
 
   run_marker <- function(rarefied_list, lookup, processed_species, marker) {
@@ -159,6 +159,9 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
           fld <- definition$field[[1]]
           lf <- analysis_field_subset(long, definition)
           if (nrow(lf) == 0) next
+          # Extra labels such as Untreated belong only to fields with those
+          # samples; do not inherit them from other fields in the cohort.
+          field_ferts <- fert_rows_for_stage(st, lf$fertilizer)
           leaf <- file.path(udir, "Goal_B_Intra_Longitudinal", fld)
           dir.create(leaf, recursive = TRUE, showWarnings = FALSE)
 
@@ -169,7 +172,7 @@ build_gold_relabund_tree <- function(gold_rarefied_species_16s, gold_universe_lo
                                   " (Top ", tn, ")"),
                    out_path = file.path(leaf,
                      paste0("stackbar_", rank, "_top", tn, "_", fld, ".png")),
-                   all_ferts = all_ferts, style = style)
+                   all_ferts = field_ferts, style = style)
             if (!is.na(w)) written <<- c(written, w)
           }
           full <- mean_relabund_gold(lf, rank, full = TRUE)

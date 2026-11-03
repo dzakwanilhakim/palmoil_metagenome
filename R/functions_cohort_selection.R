@@ -192,6 +192,20 @@ analysis_field_subset <- function(data, definition) {
     dplyr::mutate(field = label)
 }
 
+# Add a cohort-wide analysis over the union of original member kebun.
+# Build the pool from member names, never from already relabelled/duplicated
+# samples. is_combined keeps the pool out of original-kebun overview figures.
+analysis_definitions_with_pooled <- function(definitions) {
+  if (nrow(definitions) == 0) return(definitions)
+  if ("Pooled" %in% definitions$field)
+    stop("'Pooled' is reserved for cohort-wide analysis; rename the kebun ",
+         "or combined_kebun group with that name.", call. = FALSE)
+  members <- sort(unique(as.character(unlist(
+    definitions$members, use.names = FALSE))))
+  dplyr::bind_rows(definitions, tibble::tibble(
+    field = "Pooled", members = list(members), is_combined = TRUE))
+}
+
 write_analysis_cohorts <- function(selected_cohorts, combined_kebun = NULL,
                                    out_path = "Results/analysis/selected_cohorts.csv") {
   dir.create(dirname(out_path), showWarnings = FALSE, recursive = TRUE)

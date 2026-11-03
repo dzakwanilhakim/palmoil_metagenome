@@ -7,5 +7,5 @@ bold_titles: true
 bold_axis_text: true
 # Stacked bar charts: select this many named taxa independently at each rank
 # (phylum / genus / species), ranked by summed group mean relative abundance;
-# the rest go to "Other". A list makes one chart per value, e.g. [15, 50].
-stackbar_top_n: [50]
+# the rest go to "Other". A list makes one chart per value, e.g. [50, 100].
+stackbar_top_n: [100]

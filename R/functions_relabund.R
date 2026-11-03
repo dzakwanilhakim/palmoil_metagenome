@@ -3,7 +3,7 @@
 #   Source: rarefied genus table. Phylum = agglomerated from genus via lineage.
 #   Strict taxonomy already applied upstream; restricted to master samples.
 #   Plots: x=fertilizer, facet=timepoint, MEAN relative abundance per group,
-#          Top-50 taxa + "Other", "Unclassified" EXCLUDED from plots.
+#          Top-100 taxa + "Other", "Unclassified" EXCLUDED from plots.
 #   CSVs : full un-truncated mean relative abundance per rank.
 #   Goal B: per field (subset). Goal D: pooled all fields. Both same layout.
 # =============================================================================
@@ -96,7 +96,7 @@ load_species_long <- function(species_files, metadata_all, master_samples,
 # ---- SPECIES stacked bar for one subset --------------------------------------
 # Select Top-N species directly from all species in this subset, independently
 # of the genus/phylum selections; mean abundance per (fertilizer, timepoint).
-species_bar_df <- function(sp_long, top_n = 50L) {
+species_bar_df <- function(sp_long, top_n = 100L) {
   d <- sp_long
   d$taxon <- d$species
   d$taxon[is.na(d$taxon) | d$taxon == ""] <- "Unclassified"
@@ -160,7 +160,7 @@ rarefied_long <- function(norm_tables, master_samples, marker) {
 # group_cols defines the bar groups (fertilizer, timepoint [, field])
 # returns tidy: group_cols..., taxon, mean_rel (0-1). full = no Top-N truncation.
 mean_relabund <- function(long, gp_map, marker, rank, group_cols,
-                          top_n = 50L, exclude_unclassified = TRUE,
+                          top_n = 100L, exclude_unclassified = TRUE,
                           full = FALSE) {
   d <- long
   if (rank == "phylum") {
@@ -265,7 +265,7 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
                    plot.title = ggplot2::element_text(face = "bold"),
                    axis.text.x = ggplot2::element_text(angle = 45, hjust = 1),
                    legend.text = ggplot2::element_text(size = 8))
-  # long legends (e.g. Top-50): smaller keys, 25 entries per column, taller
+  # long legends (e.g. Top-100): smaller keys, 25 entries per column, taller
   # and wider figure
   legend_cols <- ceiling(n_tax / 25)
   if (n_tax > 20)
@@ -283,7 +283,7 @@ plot_stacked_bar <- function(plot_df, rank, title, out_path, all_ferts = NULL,
 # MAIN: relabund bars into the tree (Goal B per field, Goal D pooled)
 # ============================================================================
 build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
-                                 root = "Results", top_ns = 50L) {
+                                 root = "Results", top_ns = 100L) {
   gp_map    <- build_genus_phylum_map(thresholded_long)
   universes <- master_samples |> dplyr::distinct(marker, stage) |>
     dplyr::filter(!is.na(stage)) |> dplyr::arrange(marker, stage)
@@ -352,11 +352,11 @@ build_relabund_tree <- function(thresholded_long, norm_tables, master_samples,
 }
 
 # ============================================================================
-# SPECIES stacked bars (Goal B per field, Goal D pooled) — Top-50 species
+# SPECIES stacked bars (Goal B per field, Goal D pooled) — Top-100 species
 #   selected independently. Same samples as genus QC (master list).
 # ============================================================================
 build_species_tree <- function(thresholded_long, norm_tables, master_samples,
-                                species_long, root = "Results", top_n = 50L) {
+                                species_long, root = "Results", top_n = 100L) {
   if (nrow(species_long) == 0) {
     message("No species data ingested; skipping species bars."); return(character(0))
   }

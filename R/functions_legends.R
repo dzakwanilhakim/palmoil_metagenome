@@ -118,14 +118,15 @@ FIGURE_LEGENDS <- list(
     "`pcoa_{cohort}.png` - Principal coordinates of between-sample distances; points coloured by timepoint.",
     "`shannon_barplot.png` - Shannon diversity per sample."),
   "Results/data_counts/{cohort}" = c(
-    "`{kebun}_counts.png` - Number of analysed biological replicates per treatment (rows) and timepoint (columns) in one kebun."),
+    "`{kebun}_counts.png` - Number of analysed biological replicates per treatment (rows) and timepoint (columns) in one kebun.",
+    "`Pooled_counts.png`, `Pooled_counts.csv` - The same replicate inventory pooled across original kebun within the cohort; overlapping combined-kebun groups do not add duplicate samples."),
   "Goal A - one kebun, one timepoint (`Goal_A_Intra_Snapshot/{kebun}`)" = c(
     "`alpha_box_*.png` - Alpha diversity (Observed richness, Pielou evenness, Shannon) per treatment at one timepoint; boxes = median and interquartile range, points = samples. Kruskal-Wallis / Wilcoxon where a group has n >= 2; markers use raw p, CSVs carry raw and BH-adjusted p."),
   "Goal B - one kebun over time (`Goal_B_Intra_Longitudinal/{kebun}`)" = c(
     "`alpha_traj_*.png` - Alpha diversity per treatment across timepoints.",
     "`beta_ord_*.png` - Ordination of beta diversity (Aitchison, Bray-Curtis or Jaccard as named in the file); colours = timepoint; PERMANOVA in the CSVs.",
     "`beta_dendro_*.png` - Ward.D2 hierarchical clustering of samples on the same distance.",
-    "`stackbar_{rank}_topN_{kebun}.png` - Mean relative abundance per treatment (x) and timepoint (panels) from the rarefied species table. The top 50 taxa are selected independently at each rank (phylum, genus, species), ranked by summed group mean relative abundance; the remaining taxa are summed as Other (light grey); Unknown (dark grey) = unresolved name."),
+    "`stackbar_{rank}_topN_{kebun}.png` - Mean relative abundance per treatment (x) and timepoint (panels) from the rarefied species table. The top 100 taxa are selected independently at each rank (phylum, genus, species), ranked by summed group mean relative abundance; the remaining taxa are summed as Other (light grey); Unknown (dark grey) = unresolved name."),
   "Goal C - all kebun, one timepoint (`Goal_C_Cross_Snapshot`)" = c(
     "`alpha_box_crossfield_*.png` - Alpha diversity per treatment at one timepoint with all kebun pooled."),
   "Goal D - all kebun over time (`Goal_D_Cross_Longitudinal`)" = c(
@@ -133,14 +134,16 @@ FIGURE_LEGENDS <- list(
     "`beta_ord_*_faceted.png`, `beta_dendro_*_pooled.png` - Beta diversity ordination and clustering across kebun.",
     "`stackbar_{rank}_topN_pooled.png` - As Goal B stacked bars, all kebun pooled."),
   "ANCOM-BC2 differential abundance (`Differential_Abundance_Temporal/{kebun}`)" = c(
+    "`Pooled/` - Additional temporal analyses pooling original kebun within each cohort (16S_TM, 16S_Nursery, ITS_TM), with individual biological samples retained and fertilizers pooled. If da.fields is set, the pool uses the union of those groups' original member kebun. The existing per-kebun model and test settings are applied to the pooled samples.",
     "`{Tx}_vs_{Ty}/{rank}/dumbbell.png` - Taxa whose abundance differs between two timepoints (BH q < 0.05, passing the pseudo-count sensitivity check); grey dot = 0, coloured dot = bias-corrected log fold change (positive = higher at the later timepoint). Pairs are consecutive (T0 vs T1, T1 vs T2, ...) plus first vs last timepoint (e.g. T0 vs T3).",
-    "`Trajectory_{T0}_to_{Tn}/{rank}/trajectory.png` - Log fold change of each taxon versus the first timepoint (0 = no change) for the top 20 taxa, ranked by the ANCOM-BC2 global test across all timepoints. Lines = taxa (labelled at the right); point fill = timepoint; large point = significant versus the first timepoint (BH q < 0.05)."),
+    "`Trajectory_{T0}_to_{Tn}/{rank}/trajectory.png` - Log fold change of each taxon versus the first timepoint (0 = no change) for the top 20 taxa. Significant global results rank first, then significant comparisons versus the first timepoint, then maximum absolute log fold change; nonsignificant taxa can fill remaining slots. Lines = taxa (labelled at the right); point fill = timepoint; large point = significant versus the first timepoint (BH q < 0.05, with the configured pseudo-count sensitivity check); small point = not significant; reference point = baseline."),
   "FAPROTAX functional profiles (`Functional_FAPROTAX`, 16S only)" = c(
+    "`Pooled/` - Additional temporal tests, heatmap, trajectories, and annotation coverage pooling original kebun within each 16S cohort; samples are counted once, with fertilizers pooled. ITS fungi are outside the FAPROTAX database scope.",
     "Functions are predicted from taxon names (FAPROTAX 1.2.12) and are putative. Clinical/host-associated groups (human pathogens, human/mammal gut, animal parasites) are excluded from every Top-N plot.",
     "`{kebun}/{Tx}_vs_{Ty}/dumbbell.png` - Mean functional score at two timepoints for functions that differ (Wilcoxon, BH q < 0.05), top 20 by absolute change; dots coloured by timepoint. All dumbbells of one kebun share one x axis (square-root scale).",
     "`faprotax_effect_heatmap.png` - Change in mean score (later minus earlier, percentage points) per function and comparison; red = increase, blue = decrease; * = BH q < 0.05; x = insufficient samples.",
     "`faprotax_trajectories.png` - Selected functions over time: grey points = samples, coloured points = means with standard error.",
-    "`{kebun}/faprotax_trajectory_panel.png` - One panel, first to last timepoint: log2 fold change of the mean score versus the first timepoint for the top 20 functions (Kruskal-Wallis across time, BH). Lines = functions; point fill = timepoint; large point = significant versus the first timepoint (Wilcoxon, BH q < 0.05).",
+    "`{kebun}/faprotax_trajectory_panel.png` - One panel, first to last timepoint: log2 fold change of the mean score versus the first timepoint for the top 20 functions. Significant global results (Kruskal-Wallis, BH) rank first, then significant comparisons versus the first timepoint (Wilcoxon, BH), then maximum absolute log2 fold change; nonsignificant functions can fill remaining slots. Lines = functions; point fill = timepoint; large point = significant versus the first timepoint (BH q < 0.05); small point = not significant; reference point = baseline.",
     "`faprotax_annotation_coverage.png` - Fraction of each sample's reads assigned to at least one FAPROTAX function.")
 )
 

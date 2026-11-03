@@ -9,11 +9,14 @@
 # (T0 vs T1, T1 vs T2, ...) plus one initial-vs-final contrast (e.g. T0 vs T3)
 # between the first and last usable timepoints. Each contrast gets an
 # all-taxa CSV, a significant-taxa CSV, and a dumbbell plot.
+# The additional Pooled group includes every original kebun in the cohort
+# (or the union selected by da.fields), retaining individual sample counts.
 #
-# Trajectory: when a field has >= 3 usable timepoints, the same model's
+# Trajectory: when a field has >= 2 usable timepoints, the same model's
 # LFCs vs the first timepoint are drawn as one panel (T0 -> final T) for the
 # top-N taxa, ranked by ANCOM-BC2's global test (any change across time),
 # then by significance vs the first timepoint, then by max |LFC|.
+# Nonsignificant taxa can fill the remaining slots; point sizes show significance.
 #
 # The post-gold-QC cohort gate in _targets.R determines which cohorts reach
 # this driver; `da.fields` in analysis_thresholds.yaml optionally limits kebun.
@@ -203,17 +206,18 @@ consecutive_time_pairs <- function(timepoints) {
   }
 
   ranking <- long |>
+    dplyr::filter(is.finite(lfc)) |>
     dplyr::group_by(taxon) |>
     dplyr::summarise(any_sig_vs_ref = any(significant_vs_ref),
-                     max_abs_lfc = suppressWarnings(max(abs(lfc), na.rm = TRUE)),
+                     max_abs_lfc = max(abs(lfc)),
                      .groups = "drop") |>
     dplyr::left_join(glob, by = "taxon") |>
     dplyr::mutate(selected_by = dplyr::case_when(
       global_significant %in% TRUE ~ "global test",
       any_sig_vs_ref ~ paste0("vs ", ref),
-      TRUE ~ NA_character_)) |>
-    dplyr::filter(!is.na(selected_by)) |>
-    dplyr::arrange(selected_by != "global test", dplyr::desc(max_abs_lfc)) |>
+      TRUE ~ "max |LFC| (not significant)")) |>
+    dplyr::arrange(dplyr::desc(global_significant %in% TRUE),
+                   dplyr::desc(any_sig_vs_ref), dplyr::desc(max_abs_lfc), taxon) |>
     dplyr::slice_head(n = max_taxa) |>
     dplyr::mutate(trajectory_rank = dplyr::row_number()) |>
     dplyr::select(taxon, selected_by, trajectory_rank)
@@ -316,10 +320,11 @@ consecutive_time_pairs <- function(timepoints) {
       out, cohort, marker, stage, field, rank, earlier, later,
       n_earlier, n_later, cutoff, pseudo_sensitivity)
   })
-  trajectory <- if (multi)
-    .extract_temporal_trajectory(out, cohort, marker, stage, field, rank,
-                                 model_times, counts, pseudo_sensitivity,
-                                 max_taxa_trajectory)
+  # Every successful model has at least two usable timepoints. Two-level
+  # models use the reference contrast; a global test is not required.
+  trajectory <- .extract_temporal_trajectory(
+    out, cohort, marker, stage, field, rank,
+    model_times, counts, pseudo_sensitivity, max_taxa_trajectory)
   done(dplyr::bind_rows(tested, skipped), trajectory)
 }
 
@@ -488,11 +493,13 @@ plot_temporal_da_trajectory <- function(trajectory, cutoff, max_taxa,
                    stringr::str_to_title(first$rank), " — trajectory ",
                    first$reference, " to ", first$final),
     subtitle = paste0("ANCOM-BC2, all fertilizers pooled within kebun; top ", max_taxa,
-                      " taxa by global test, then vs ", first$reference,
-                      ", then max |LFC|; BH q < ", cutoff),
+                      " taxa: significant first (global, then vs ", first$reference,
+                      "), then max |LFC|; nonsignificant taxa included;",
+                      " point size shows significance vs ", first$reference,
+                      " (BH q < ", cutoff, ")"),
     y_label = paste0("Log fold change vs ", first$reference),
     reference = first$reference, cutoff = cutoff,
-    empty_note = "No taxa significant across time", style = style, out_path = out_path)
+    empty_note = "No taxa with finite trajectory estimates", style = style, out_path = out_path)
 }
 
 .write_temporal_trajectory <- function(trajectory, cutoff, max_taxa, style, root) {
@@ -588,9 +595,11 @@ build_gold_temporal_da <- function(gold_processed_matrix_16s_genus,
       if (nrow(pairs) == 0) next
       definitions <- analysis_field_definitions(
         spec$lookup, spec$marker, st, combined_kebun)
+      if (length(only_fields))
+        definitions <- dplyr::filter(definitions, field %in% only_fields)
+      definitions <- analysis_definitions_with_pooled(definitions)
       for (field_i in seq_len(nrow(definitions))) {
         fld <- definitions$field[[field_i]]
-        if (length(only_fields) && !fld %in% only_fields) next
         members <- as.character(unlist(
           definitions$members[[field_i]], use.names = FALSE))
         run <- .run_temporal_field_rank(

@@ -7,10 +7,12 @@
 # not form a mutually exclusive composition. Consecutive timepoints, plus the
 # first vs last usable timepoint (e.g. T0 vs T3), are therefore tested with an
 # unpaired Wilcoxon rank-sum test (BH correction), separately for each cohort
-# and kebun. Kebun with >= 3 usable timepoints also get a one-panel trajectory
+# and kebun. Kebun with >= 2 usable timepoints also get a one-panel trajectory
 # (top-N functions, Kruskal-Wallis across time). Fertilizers are pooled
 # analytically: individual samples are retained, but fertilizer is not a
 # grouping variable.
+# An additional Pooled group compares timepoints across all original kebun
+# within each 16S cohort, retaining individual sample functional scores.
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -602,12 +604,14 @@ plot_faprotax_trajectories <- function(scores, lookup, functions, valid_fields,
 # functions); Wilcoxon vs the first timepoint per timepoint (BH per timepoint).
 # trajectory_rank marks the top N: global significant first, then significant
 # vs the first timepoint, then max |log2 FC|; excluded groups never ranked.
+# Nonsignificant functions can fill the remaining slots.
 .fap_trajectory <- function(scores, meta, stage, field, cutoff, min_samples,
                             min_prevalence, pseudocount, exclude, max_n) {
   meta <- dplyr::filter(meta, `Sample alias` %in% names(scores), !is.na(waktu))
   counts <- table(as.character(meta$waktu))
   times <- .ordered_timepoints(names(counts)[counts >= min_samples])
-  if (length(times) < 3) return(NULL)
+  # A reference and one later timepoint are enough to show a change.
+  if (length(times) < 2) return(NULL)
   meta <- dplyr::filter(meta, waktu %in% times)
   ids <- meta$`Sample alias`
   grp <- factor(as.character(meta$waktu), levels = times)
@@ -647,16 +651,19 @@ plot_faprotax_trajectories <- function(scores, lookup, functions, valid_fields,
                   excluded_from_top = function_name %in% exclude)
 
   ranking <- long |>
-    dplyr::filter(!excluded_from_top) |>
+    dplyr::filter(!excluded_from_top, is.finite(value)) |>
     dplyr::group_by(function_name) |>
     dplyr::summarise(global_sig = any(global_significant),
                      any_sig = any(significant_vs_ref),
-                     max_abs = max(abs(value), na.rm = TRUE), .groups = "drop") |>
-    dplyr::filter(global_sig | any_sig) |>
-    dplyr::arrange(dplyr::desc(global_sig), dplyr::desc(max_abs)) |>
+                     max_abs = max(abs(value)), .groups = "drop") |>
+    dplyr::arrange(dplyr::desc(global_sig), dplyr::desc(any_sig),
+                   dplyr::desc(max_abs), function_name) |>
     dplyr::slice_head(n = max_n) |>
     dplyr::mutate(trajectory_rank = dplyr::row_number(),
-                  selected_by = ifelse(global_sig, "global test", paste0("vs ", times[[1]])))
+                  selected_by = dplyr::case_when(
+                    global_sig ~ "global test",
+                    any_sig ~ paste0("vs ", times[[1]]),
+                    TRUE ~ "max |log2 FC| (not significant)"))
 
   long |>
     dplyr::left_join(dplyr::select(ranking, function_name, selected_by, trajectory_rank),
@@ -678,12 +685,14 @@ plot_faprotax_trajectories <- function(scores, lookup, functions, valid_fields,
     title = paste0(first$cohort, " — ", first$field, " — FAPROTAX trajectory ",
                    first$reference, " to ", first$final),
     subtitle = paste0("Mean functional score, fertilizers pooled within kebun; top ", max_n,
-                      " functions by Kruskal-Wallis across time, then Wilcoxon vs ",
-                      first$reference, ", then max |log2 FC|; BH q < ", cutoff,
+                      " functions: significant first (Kruskal-Wallis, then Wilcoxon vs ",
+                      first$reference, "), then max |log2 FC|; nonsignificant functions included;",
+                      " point size shows significance vs ", first$reference,
+                      " (BH q < ", cutoff, ")",
                       "; clinical/host-associated groups excluded"),
     y_label = paste0("log2 fold change of mean score vs ", first$reference),
     reference = first$reference, cutoff = cutoff,
-    empty_note = "No functions significant across time", style = style, out_path = png)
+    empty_note = "No eligible functions with finite trajectory estimates", style = style, out_path = png)
 
   per_fn <- dplyr::distinct(trajectory, function_name, global_significant, trajectory_rank)
   times <- dplyr::distinct(trajectory, time_order, waktu, n) |> dplyr::arrange(time_order)
@@ -801,6 +810,7 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
     if (nrow(pairs) == 0) next
     definitions <- analysis_field_definitions(
       lookup_16s, "16S", st, combined_kebun)
+    definitions <- analysis_definitions_with_pooled(definitions)
     for (field_i in seq_len(nrow(definitions))) {
       definition <- definitions[field_i, , drop = FALSE]
       fld <- definition$field[[1]]
@@ -856,6 +866,7 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
     if (nrow(cohort_results) == 0) next
     definitions <- analysis_field_definitions(
       lookup_16s, "16S", st, combined_kebun)
+    definitions <- analysis_definitions_with_pooled(definitions)
     original_fields <- definitions$field[!definitions$is_combined]
     overview_results <- dplyr::filter(
       cohort_results, field %in% original_fields)
@@ -875,9 +886,8 @@ build_faprotax_temporal <- function(faprotax_annotation, lookup_16s,
       style, trajectory_path)
     written <- c(written, heatmap_path, trajectory_path)
 
-    # Repeat all three overview visualizations within each kebun. Function
-    # selection is recalculated locally so a strong signal in one kebun does
-    # not determine what is displayed for another kebun.
+    # Repeat all three overview visualizations within each kebun and the
+    # pooled cohort. Function selection is recalculated for each group.
     for (field_i in seq_len(nrow(definitions))) {
       definition <- definitions[field_i, , drop = FALSE]
       fld <- definition$field[[1]]

@@ -126,7 +126,7 @@ Results/       generated outputs (see below)
      n>=2 gate, BH-adjusted.
    - Beta (Aitchison/Bray-Curtis/Jaccard): ordinations, Ward.D2 dendrograms,
      PERMANOVA. Generated for Goals B and D.
-   - Relative abundance: Top-50 stacked bars selected independently for
+   - Relative abundance: Top-100 stacked bars selected independently for
      phylum, genus, and species, with remaining taxa grouped as Other, plus
      full CSVs.
    - Temporal differential abundance: ANCOM-BC2 at genus and species levels,
@@ -165,6 +165,7 @@ Results/
 │                                  treatment_Nursery.png, biofertilizer_contents.png,
 │                                  timepoint_colours.png, figure_legends.md
 ├── data_counts/<universe>/<field>_counts.png   replicate inventory tables
+│                         Pooled_counts.png/.csv   cohort-wide counts
 └── <universe>/
     ├── Goal_A_Intra_Snapshot/<field>/      alpha boxplots + sliced stats
     ├── Goal_B_Intra_Longitudinal/<field>/  alpha trajectories, beta, stacked bars
@@ -186,6 +187,30 @@ The same three visualizations are also generated inside every kebun directory,
 using functions ranked from that kebun alone:
 `faprotax_effect_heatmap.png`, `faprotax_trajectories.png`, and
 `faprotax_annotation_coverage.png`.
+
+Counts and ANCOM-BC2 also include a pooled analysis for each selected cohort:
+`16S_TM`, `16S_Nursery`, and `ITS_TM`. Pooled count tables are saved as
+`Results/data_counts/<cohort>/Pooled_counts.png` and `Pooled_counts.csv`.
+Pooled ANCOM-BC2 CSVs, dumbbells, and trajectory panels are under
+`Results/<cohort>/Differential_Abundance_Temporal/Pooled/`, at genus and species
+levels. FAPROTAX adds pooled CSVs, dumbbells, heatmaps, trajectories, and
+coverage plots under `Results/<16S_cohort>/Functional_FAPROTAX/Pooled/`;
+FAPROTAX does not annotate ITS fungi.
+
+Pooling retains individual samples from original kebun within one cohort;
+overlapping combined-kebun groups never add duplicate samples. The existing
+per-kebun statistical methods and cutoffs are reused for these pooled temporal
+comparisons. The cohort/field gate still applies; `da.fields`, when set,
+further limits the ANCOM-BC2 pool to the union of the selected groups' members.
+Existing analysis summary CSVs include the additional rows as `field = Pooled`.
+
+To build these outputs with the existing targets:
+
+```r
+targets::tar_make(names = gold_count_tables)
+targets::tar_make(names = gold_temporal_da_files)
+targets::tar_make(names = faprotax_temporal_files)
+```
 
 ## Important notes
 

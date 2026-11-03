@@ -1,6 +1,6 @@
 # =============================================================================
 # R/functions_gold_counts.R  —  Synchronized: data_counts (gold-tier)
-#   Replicate-count tables per field (post gold-tier QC), from
+#   Replicate-count tables per field and pooled cohort (post gold-tier QC), from
 #   gold_universe_lookup_{16s,its} (Kode Pupuk x Waktu grid) instead of the
 #   established pipeline's master_samples. Reuses render_count_png() and the
 #   TIMEPOINTS_ALL/fert_rows_for_stage() scaffolding from functions_counts.R
@@ -41,9 +41,10 @@ build_gold_count_tables <- function(gold_universe_lookup_16s, gold_universe_look
       outdir <- file.path(root, "data_counts", ucode)
       definitions <- analysis_field_definitions(
         lookup, marker, st, combined_kebun)
+      definitions <- analysis_definitions_with_pooled(definitions)
       if (nrow(definitions) == 0) next
       message("=== GOLD COUNTS ", ucode, " (", nrow(definitions),
-              " original/combined fields) ===")
+              " original/combined/pooled groups) ===")
 
       for (i in seq_len(nrow(definitions))) {
         definition <- definitions[i, , drop = FALSE]
@@ -51,6 +52,11 @@ build_gold_count_tables <- function(gold_universe_lookup_16s, gold_universe_look
         field_lookup <- analysis_field_subset(
           dplyr::filter(lookup, stage == st), definition)
         grid <- gold_field_count_grid(field_lookup, st, fld)
+        if (fld == "Pooled") {
+          csv <- file.path(outdir, "Pooled_counts.csv")
+          readr::write_csv(grid, csv)
+          written <- c(written, csv)
+        }
         out  <- file.path(outdir, paste0(fld, "_counts.png"))
         w <- tryCatch(
           render_count_png(grid,
@@ -63,6 +69,6 @@ build_gold_count_tables <- function(gold_universe_lookup_16s, gold_universe_look
       }
     }
   }
-  message("Gold count tables complete: ", length(written), " PNGs.")
+  message("Gold count tables complete: ", length(written), " files.")
   written
 }

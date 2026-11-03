@@ -402,7 +402,7 @@ list(
   tar_target(beta_analysis_plots, beta_analysis$plots, format = "file"),
   tar_target(beta_analysis_permanova_csv, beta_analysis$permanova_csv, format = "file"),
 
-  # ---- data_counts (synchronized from established pipeline) ----------------
+  # ---- data_counts: per kebun + pooled cohort PNG/CSV ----------------------
   tar_target(gold_count_tables,
              build_gold_count_tables(gold_universe_lookup_16s,
                                      gold_universe_lookup_its,
@@ -437,7 +437,7 @@ list(
                                       combined_kebun = combined_kebun),
              format = "file"),
 
-  # ---- Temporal DA (ANCOM-BC2): per kebun, fertilizers pooled ------------
+  # ---- Temporal DA (ANCOM-BC2): per kebun + pooled cohort -----------------
   # One model per cohort x kebun x rank; export consecutive pairs
   # (T0 vs T1, T1 vs T2, ...) plus initial vs final (e.g. T0 vs T3), and a
   # T0 -> final trajectory panel (top-N taxa), at genus and species levels.
@@ -452,7 +452,7 @@ list(
                                     combined_kebun = combined_kebun)),
   tar_target(gold_temporal_da_files, gold_temporal_da$files, format = "file"),
 
-  # ---- FAPROTAX functional inference: per kebun, fertilizers pooled -------
+  # ---- FAPROTAX functional inference: per kebun + pooled 16S cohort --------
   # FAPROTAX maps prokaryotic taxa, so this branch consumes 16S species only.
   # Scores are normalized per sample before functional collapsing; consecutive
   # timepoints are compared by Wilcoxon rank-sum tests with BH correction.
