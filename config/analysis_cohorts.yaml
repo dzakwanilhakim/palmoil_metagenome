@@ -3,6 +3,12 @@
 # Default: analyze every supported cohort.
 selected: ALL
 
+# Optional kebun filter (Kode Kebun) for quick end-to-end tests, e.g. [AMR].
+# Empty = all kebun. Pooled (Goal C/D) outputs then contain only these kebun,
+# and processing filters (prevalence, rarefaction depth) are computed on this
+# subset, so set it back to [] for real results.
+fields: []
+
 # Additional analysis-only kebun groups. Original kebun are always retained.
 # Groups may overlap: for example NSA contributes to both AAL and Sampoerna,
 # but is counted only once inside each group. These groups are added to every
