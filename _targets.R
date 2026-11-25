@@ -32,8 +32,12 @@ list(
   # metadata workbook would be silently ignored. Re-listing is cheap;
   # downstream targets still rebuild only if the file set or contents change.
   tar_target(source_metadata_files,
-             list.files("data/source", pattern = "_metadata\\.xlsx$",
-                        full.names = TRUE),
+             {
+               files <- list.files("data/source", pattern = "_metadata\\.xlsx$",
+                                   full.names = TRUE)
+               # Excel lock files are not readable metadata workbooks.
+               files[!startsWith(basename(files), "~$")]
+             },
              format = "file", cue = tar_cue(mode = "always")),
 
   tar_target(source_metadata_raw, compile_source_metadata(source_metadata_files)),
