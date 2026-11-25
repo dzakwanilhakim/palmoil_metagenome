@@ -11,6 +11,9 @@ dependencies:
   # build tools + -devel libs so renv can compile packages from source
   - cmake            # nloptr, highs, fs, arrow
   - pkg-config
+  - cairo            # Cairo -> ggrastr -> scater -> mia
+  - xorg-xorgproto    # X11 protocol headers + pkg-config metadata for Cairo
+  - rust             # rustc + cargo for clarabel
   - libxml2
   - libxml2-devel    # igraph, xml2 (libxml2 alone ships only the runtime .so)
   - mpfr             # Rmpfr

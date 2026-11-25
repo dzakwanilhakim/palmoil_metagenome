@@ -49,6 +49,23 @@ Notes:
   missing library, add it there, run
   `mamba env update -n palmoil -f environment_r.yml`, and re-run the restore
   (already-built packages come from the renv cache).
+- If restore reports missing `cairo.h` for `Cairo` or missing `rustc`/`cargo`
+  for `clarabel`, update the environment and retry from the repository root.
+  The environment file includes `cairo`, `xorg-xorgproto`, and `rust` for
+  these builds. Cairo can be installed while its detection still fails if
+  X11 protocol metadata such as `xproto.pc` is missing. The `pkg-config`
+  check below reports these missing dependencies.
+
+  ```bash
+  conda activate palmoil
+  mamba env update -n palmoil -f environment_r.yml
+  pkg-config --print-errors --cflags --libs cairo
+  rustc --version
+  cargo --version
+  R -e 'renv::restore(prompt = FALSE)'
+  ```
+
+  This also retries the dependent packages `ggrastr`, `scater`, and `mia`.
 - `renv.lock` was recorded on R 4.5.3; pin `r-base=4.5.3` in
   `environment_r.yml` if renv warns about a version mismatch.
 - `environment_py.yaml` (`palmoil_py`) is only needed for the standalone
